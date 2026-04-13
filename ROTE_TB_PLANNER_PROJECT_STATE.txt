@@ -1,0 +1,1039 @@
+python -m PyInstaller --onefile --name ROTE_Planner rote_planner.py
+
+
+================================================================================
+  ROTE TB PLANNER — COMPLETE PROJECT STATE DOCUMENT
+  Star Wars: Galaxy of Heroes — Rise of the Empire Territory Battle
+  Generated: April 2026 | Source file: rote_planner_v6.py (~5,634 lines)
+================================================================================
+
+This document describes every system, page, data source, known issue, API
+behavior, algorithm, and future work item for the ROTE TB Planner application.
+It is intended to allow any AI tool or developer to fully understand and
+continue work on this project without access to the original conversation.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 1 — WHAT THE APPLICATION IS
+────────────────────────────────────────────────────────────────────────────────
+
+The ROTE TB Planner is a self-contained desktop application for guilds playing
+Star Wars: Galaxy of Heroes (SWGoH). It helps guild officers plan territory
+battle (TB) phases — specifically the "Rise of the Empire" (ROTE) TB format.
+
+Architecture: A single Python file (rote_planner_v6.py) that:
+  1. Embeds a complete HTML/CSS/JavaScript single-page application (SPA) as a
+     Python string (HTML_APP = r"""..."""), served over a local HTTP server.
+  2. Runs a ThreadingHTTPServer on port 8080 for the web interface.
+  3. Launches and manages a "comlink" Node.js proxy on port 3000, which
+     provides authenticated access to the SWGoH game servers.
+  4. Exposes a REST-like API at /api/* for the frontend to call.
+  5. Is distributed as a single .exe via PyInstaller (--onefile).
+
+The application is entirely local — no cloud services, no external APIs except
+comlink (which communicates with EA's SWGoH game servers). The one exception
+was an AI integration that has since been removed.
+
+Build command:
+  python -m PyInstaller --onefile --name ROTE_Planner rote_planner_v6.py
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 2 — COMLINK PROXY: HOW THE GAME API WORKS
+────────────────────────────────────────────────────────────────────────────────
+
+WHAT COMLINK IS:
+  Comlink is an open-source Node.js proxy that authenticates with EA's SWGoH
+  game servers and exposes a local HTTP API. The app auto-detects comlink in
+  several locations, can download it if missing, and auto-restarts it on crash.
+
+COMLINK LOCATION SEARCH ORDER:
+  1. .comlink/ subfolder beside the exe
+  2. ./comlink (same directory)
+  3. ~/comlink (home directory)
+  4. Auto-downloaded if not found
+
+COMLINK VERSION: v4.x (POST-only, all requests require enums:false)
+
+COMLINK ENDPOINTS USED:
+  POST http://localhost:3000/player
+    Body: {"payload": {"allyCode": "123456789"}, "enums": false}
+    OR:   {"payload": {"playerId": "base64-guid"}, "enums": false}
+    Returns: player object with rosterUnit array
+
+  POST http://localhost:3000/guild
+    Body: {"payload": {"guildId": "guild-id-string"}, "enums": false}
+    Returns: guild object with member list
+
+  POST http://localhost:3000/data
+    Body: {"payload": {"segment": N}, "enums": false}
+    Segment numbers 1, 3, 6, 10, 11, 12 tried for unit definitions
+    Returns: game data (unit definitions, ability data, etc.)
+
+  POST http://localhost:3000/localization
+    Body: {"payload": {"id": "Loc_ENG_US.txt", "unzip": true}, "enums": false}
+    Pattern in localization: UNIT_MAGMATROOPER_NAME = "Magma Trooper"
+    This is the intended way to get unit display names from comlink.
+
+COMLINK v4 CONFIRMED FIELD NAMES (from scan_log.json analysis):
+  Unit keys returned by /player in rosterUnit[]:
+    - definitionId: "BASEUNIT:SEVEN_STAR" (strip suffix after ":" to get defId)
+    - currentRarity: integer 1-7 (star level) — NOT "rarity"
+    - currentTier: integer 1-13 (gear level) — NOT "gear"
+    - currentLevel: integer (character level)
+    - currentXp: integer
+    - relic: object with {currentTier: N} where tier 1=not reliced, 3=R1...9=R7
+      So relic_level = max(0, relic.currentTier - 2)
+    - skill: array of {id: "skillname_DEFID", tier: N}
+    - purchasedAbilityId: array of ability ID strings (zeta/omicron purchased)
+    - equippedStatMod: array (present for characters, absent/empty for ships)
+    - equipment: array
+    - unitStat: CONFIRMED PRESENT BUT VALUE IS None/null IN BASIC ENDPOINT
+      Speed stats are NOT available from the basic /player endpoint.
+      Speed requires the stats endpoint or swgoh.gg private API.
+    - combatType: NOT RETURNED by comlink v4 basic endpoint
+      Must be inferred from defId or ship detection logic.
+
+ZETA/OMICRON DETECTION (comlink v4):
+  Zetas and omicrons are stored in purchasedAbilityId[].
+  Each entry is an ability ID string.
+  If the ability ID contains "omicron" (case-insensitive) → count as omicron.
+  Otherwise → count as zeta.
+  IMPORTANT: purchasedAbilityId was EMPTY for all members in last scan log.
+  This may be because the basic endpoint doesn't return this data, or because
+  the members hadn't purchased any. The high_relic_purchased field in scan
+  log will show this on next scan.
+
+SHIP DETECTION (comlink v4):
+  combatType field is absent. Ships are detected by:
+  Python side: _SHIP_DEFIDS set (103 entries) checked against defId
+  JavaScript side: _SHIP_IDS set (~50 entries) in filterRoster()
+  Also: characters have equippedStatMod (mods); ships typically don't.
+
+ALLY CODE HANDLING (CRITICAL):
+  Guild member ally codes from the /guild response come as base64 URL-safe
+  encoded GUIDs, e.g., "fo8f8goIT2mjZKtRXZh8-w"
+  These MUST NOT have hyphens stripped. Hyphens are significant characters.
+  Only numeric ally codes (e.g., "659-388-776") should have hyphens stripped.
+  Fix applied: check if raw.replace("-","").isdigit() before stripping.
+
+SCAN FAILURES (fixed in current version):
+  16 of 49 members failed in previous scans due to hyphen-stripping bug.
+  All 49 now scan successfully (0 failures confirmed in latest scan log).
+
+COMLINK RELIABILITY:
+  - Background watchdog thread checks every 15 seconds if comlink is alive
+  - Pipe drain threads prevent stdout/stderr buffer blocking crashes
+  - Auto-restart on crash with exponential backoff
+  - /api/comlink-health endpoint checks liveness and triggers restart
+
+UNIT NAME RESOLUTION FROM COMLINK:
+  The basic /player endpoint does NOT return character display names.
+  nameKey field is MISSING from rosterUnit entries.
+  The /localization endpoint (Loc_ENG_US.txt) contains all names in pattern:
+    UNIT_{DEFID}_NAME = "Display Name"
+  The /data endpoint with various segment numbers may return unit definitions
+  with nameKey fields, but results vary by comlink version.
+  Current fallback: comprehensive static UNIT_NAMES table in JS (270 chars).
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 3 — DATA SOURCES
+────────────────────────────────────────────────────────────────────────────────
+
+PRIMARY DATA SOURCES (all verified and baked into the app):
+
+1. swgoh.gg/api/characters/ and /api/ships/
+   - Public REST API returning base_id and name for all units
+   - Returns JSON with fields: base_id, name, combat_type, alignment, etc.
+   - Used by "Fetch Unit Names" button as first source
+   - Sometimes returns 403 or blocks scrapers — not fully reliable
+   - Format: [{base_id: "AAYLASECURA", name: "Aayla Secura", ...}, ...]
+
+2. swgoh.wiki/wiki/Characters and swgoh.wiki/wiki/Ships
+   - MediaWiki pages listing all characters and ships
+   - Character names and associated ship names extractable
+   - URL slug → defId derivation: strip spaces/underscores, uppercase
+   - Used to supplement name table
+
+3. User-provided Excel file (swgoh_characters_ships.xlsx):
+   AUTHORITATIVE SOURCE — 4 sheets:
+   
+   Sheet "Characters" (270 rows, 5 columns):
+     - Character Name: display name (e.g., "Ahsoka Tano (Fulcrum)")
+     - Zeta Ability Name(s): " - " separated list (e.g., "Whirlwind")
+     - Omicron Ability Name(s): " - " separated list (e.g., "Perseverance")
+     - Base ID: comlink defId (e.g., "FULCRUMAHSOKA") — AUTHORITATIVE KEY
+     - Source URL: swgoh.gg unit page URL for verification
+   
+   Sheet "Announced" (2 rows):
+     - Characters announced but not yet released as of April 2026:
+       Cobb Vanth, KX Security Droid
+     - No Base IDs yet (not in game)
+   
+   Sheet "Ships" (70 rows, 1 column):
+     - Ship Name: display name only (no base IDs for ships)
+     - All 70 current ships listed
+
+   Sheet "Sources":
+     - GitHub: ExeAy/swgoh-sas-farm-guide (characters.json + abilities.json)
+     - swgoh.gg/ships/ and /characters/ (live pages)
+   
+   Data from this Excel is baked into UNIT_NAMES, UNIT_ABILITIES,
+   SHIP_NAMES, and ALL_CHAR_NAMES constants in the JavaScript.
+
+4. swgoh.wiki/wiki/Rise_of_the_Empire_Territory_Battle (and planet pages)
+   - Star point thresholds per planet per zone
+   - CM points per player, Fleet points per player, Ops points per platoon
+   - All values hardcoded in ALL_PLANETS array in JavaScript
+
+5. User-provided scan_log.json files:
+   - Written by Python server after each roster scan
+   - Contains raw_unit_debug for first unit and highest-relic unit
+   - Used to diagnose comlink field names and scan failures
+   - Located in .comlink/ directory alongside the exe
+
+PENDING DATA SOURCE (not yet integrated):
+  - swgoh.gg private API (user working on access)
+  - Would provide: full stats including speed, ability details, mod data
+  - Format will use base_id and name fields (same as public API)
+  - Speed stat is the main missing data point currently
+  - Integration planned once API key is obtained
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 4 — JAVASCRIPT DATA TABLES (baked into the app)
+────────────────────────────────────────────────────────────────────────────────
+
+UNIT_NAMES (270 entries):
+  Maps Base ID (exact string from comlink definitionId prefix) → display name
+  Keys are the literal Base ID strings from the Excel file (case-sensitive)
+  Special case: "50RT" must be quoted as a JS key (starts with digit)
+  Examples:
+    CHOPPERS3 → "Chopper"
+    HERASYNDULLAS3 → "Hera Syndulla"
+    FULCRUMAHSOKA → "Ahsoka Tano (Fulcrum)"
+    VADER → "Darth Vader"
+    MAUL → "Darth Maul"
+    MAULS7 → "Maul"
+    DAKA → "Old Daka"
+    TRENCH → "Admiral Trench"
+    MOFFGIDEONS1 → "Moff Gideon"
+    MOFFGIDEONS3 → "Dark Trooper Moff Gideon"
+    LORDVADER → "Lord Vader"
+    GRANDMASTERLUKE → "Jedi Master Luke Skywalker"
+    SITHPALPATINE → "Sith Eternal Emperor"
+    GLREY → "Rey"
+    GLLEIA → "Leia Organa"
+
+UNIT_ABILITIES (270 entries):
+  Maps Base ID → {z: [zeta names], o: [omicron names]}
+  Used in Roster tab for hover tooltips on Z/O badges
+  Examples:
+    LORDVADER: {z:["Dark Harbinger","Galactic Legend","My New Empire",
+                   "Twisted Prophecy","Unshackled Emotions","Vindictive Storm"],
+                o:[]}
+    GRANDINQUISITOR: {z:["Compassion Leaves a Trail","Master Inquisitorius",
+                         "Pain Can Break Anyone"],
+                     o:["Compassion Leaves a Trail","Master Inquisitorius",
+                        "Ready to Die?"]}
+
+SHIP_NAMES (70 entries):
+  All current ship display names for datalists/dropdowns
+  Examples: "Ahsoka Tano's Jedi Starfighter", "Razor Crest", "Executor", etc.
+
+ALL_CHAR_NAMES:
+  Sorted array of all 270 character display names
+  Used for datalist autocomplete in Guides squad editor
+
+ANNOUNCED_CHARS:
+  ['Cobb Vanth', 'KX Security Droid']
+  Characters announced but not yet in game — for future filtering use
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 5 — APPLICATION PAGES (5 tabs)
+────────────────────────────────────────────────────────────────────────────────
+
+═══════════════════════════════════════════════════════
+TAB 1: GUILD OVERVIEW (id="setup", panel="panel-setup")
+═══════════════════════════════════════════════════════
+
+PURPOSE: Central hub for guild configuration and roster scanning.
+
+SECTIONS:
+  A) Guild Connection Status
+     - "Comlink Status" indicator (green/red): calls /api/status
+       Checks if comlink process is alive on port 3000
+       Auto-restarts comlink if not running (tries up to 3 times)
+     - "Shutdown Server" button: kills Python server and comlink
+
+  B) Guild Import (3 methods)
+     1. Ally Code → Fetch Guild:
+        Input ally code (numeric "659-388-776" or base64 GUID)
+        Calls /api/guild-by-allycode → comlink /guild endpoint
+        Returns guild name, GP, member list with ally codes
+     
+     2. Paste JSON (fallback method):
+        User manually visits swgoh.gg/api/guilds/[slug]/?format=json
+        Copies the full JSON, pastes into textarea
+        Click "Import Pasted JSON" to parse it
+     
+     3. Guild Name Display:
+        Once imported, shows guild name, member count, total GP
+        Member list stored in HTML data attribute for roster tab access
+
+  C) Guild Stats (metric cards):
+     - Total Guild GP (editable input)
+     - Active Members (editable, for non-participation adjustment)
+     - "Est. Stars" (read-only): shows _lastPlanStars from last optimizer run
+       OR falls back to quick greedy estimate if no plan has been run
+       IMPORTANT: Invalidated (shows —) when settings change. Stays in sync
+       with Day-by-Day Plan tab's displayed star total.
+
+  D) Scan Rosters section:
+     - "Scan Rosters" button: iterates all guild members
+       For each member: calls /api/roster → comlink /player endpoint
+       3 retries with backoff on failure
+       Progress bar shows N/total scanned + estimated time remaining
+       On success: updates completion rates per planet, repopulates dropdowns
+     - "Cancel" button: stops mid-scan
+     - Results stored in guildRosters{allyCode: [simplified_units]}
+     - Scan log written to .comlink/scan_log.json
+
+  E) Key ROTE Units counter:
+     Shows how many guild members have each of 15 key ROTE units at R5+
+     KEY_UNITS array (KNOWN BUG — defIds are WRONG in current code):
+       'GRANDMASTER_YODA' should be 'GRANDINQUISITOR' (Grand Inquisitor)
+       'SITHPUREBLOOD' should be 'LORDVADER' (Lord Vader)  
+       'JEDIKNIGHTREVAN' labeled "Darth Vader" — should be 'VADER'
+       'DARTHVADER' labeled "Darth Vader (old)" — duplicate, should be removed
+       'JYNSO' should be 'JYNERSO' (Jyn Erso)
+       'BOKATAN' should be 'MANDALORBOKATAN' (Bo-Katan Mand'alor)
+       These defId mismatches mean the counter shows 0 for most key units
+       even after scanning. NEEDS FIX.
+
+  F) Fetch Unit Names button:
+     Calls /api/fetch-unit-names which tries:
+       1. swgoh.gg/api/characters/ and /api/ships/ (public API, may 403)
+       2. comlink /data with segments 1,3,6,10,11,12 (variable results)
+       3. comlink /localization with Loc_ENG_US.txt (UNIT_DEFID_NAME pattern)
+     Merges results into UNIT_NAMES runtime table
+     Current status: "Could not fetch unit names from comlink" error reported
+     The localization approach (source 3) is most promising but untested
+
+═══════════════════════════════════════════════════════
+TAB 2: PLANET PLANNER (id="planner", panel="panel-planner")
+═══════════════════════════════════════════════════════
+
+PURPOSE: Manual configuration of expected performance per planet.
+
+LAYOUT:
+  Three chain columns: Dark Side (red) | Mixed (orange) | Light Side (blue)
+  Each chain: 6 planets displayed in sequence (zone 1 through 6)
+  Connector lines between planets showing chain flow
+
+PLANET CARD CONTENTS (per planet):
+  - Planet name, zone, alignment, phase indicator
+  - Capability badge: "N/total can do R[X]+ CMs" (from roster scan)
+  - Star display: current estimated stars (1/2/3 or none)
+  - Point total progress bar toward 3-star threshold
+  - CM Completion Rate/Count input (% or count override)
+  - Fleet Completion Rate/Count input (if fleet available)
+  - Special Mission section (if applicable):
+    - Count input (how many guild members completed the SM)
+    - Progress bar toward unlock threshold
+    - Unlock status indicator
+    - CRITICAL: SM count is the ONLY way to unlock bonus planets.
+      Setting bracca.smCount ≥ 30 unlocks Zeffo.
+      Setting tatooine.smCount ≥ 25 unlocks Mandalore.
+  - Ops Platoon buttons (1-6): toggle which platoons are filled
+    Click to toggle on/off. Filled platoons add opsVal points.
+  - Est Points display and per-source breakdown
+
+PLANET DATA (all from swgoh.wiki, hardcoded):
+  Zone 1: Mustafar/Corellia/Coruscant — CM: 200k/player, Fleet: 400k/player
+  Zone 2: Geonosis/Felucia/Bracca — CM: 250k/player, Fleet: 500k/player
+  Zone 3: Dathomir/Tatooine/Kashyyyk — CM: 341,250/player, Fleet: 682,500*
+  Zone 4: Med Station/Kessel/Lothal — CM: 493,594/player
+  Zone 5: Malachor/Vandor/Kafrene — CM: 721,744/player
+  Zone 6: Death Star/Hoth/Scarif — CM: 1,151,719/player, Fleet: 2,303,438
+  Ops per platoon by zone: 10M, 11M, 13.2M, 18.48M, 33.26M, 86.49M
+  *Not all zones have fleet; Dathomir/Med Station/Malachor have no fleet
+
+  Bonus Planets:
+    Mandalore: Zone 4 equivalent, unlocked when tatooine.smCount ≥ 25
+    Zeffo: Zone 3 equivalent, unlocked when bracca.smCount ≥ 30
+
+FALLOFF SYSTEM:
+  CM and Fleet completion rates drop off for later planets in each chain.
+  Controls:
+    - Base CM Rate (% of guild that completes each CM)
+    - Base Fleet Rate (% that completes fleet)
+    - CM Falloff (% decrease per zone deeper in chain)
+    - Fleet Falloff
+    - CM Mode: "% of members" or "exact count"
+  Formula: effectiveRate = clamp(base - falloff * chainDepth, 0, 100)
+  Individual planet overrides bypass falloff calculation
+
+UNDEPLOY TABLE:
+  Per-day adjustment for undeployed GP
+  Mode: percentage of guild GP or flat GP amount
+  Used by gpForDay() to calculate available GP each day
+
+POINT CALCULATION (calcPlanetPts):
+  total = cmPts + fleetPts + opsPts + gpDeploy + preloaded
+  cmPts = planet.cms × round(activeMemberCount × cmRate) × planet.cmPts
+  fleetPts = planet.fleets × round(activeMemberCount × fleetRate) × planet.fleetPts
+  opsPts = filledPlatoons × planet.opsVal
+  gpDeploy = manual override input
+  preloaded = banked points from previous day
+
+KNOWN STATE ISSUES:
+  - Ops buttons: previously discovered that toggling ONE ops platoon caused
+    star estimates to decrease. Root cause was sequential GP allocation in
+    the greedy future simulator (DS chain consumed all GP, LS got nothing).
+    Fixed with proportional GP allocation in simulateFuture().
+  - The "Apply to Planet Planner" button fills rates from roster scan data.
+
+═══════════════════════════════════════════════════════
+TAB 3: DAY-BY-DAY PLAN (id="dayplan", panel="panel-dayplan")
+═══════════════════════════════════════════════════════
+
+PURPOSE: Multi-algorithm optimizer to find the best 6-day deployment plan.
+
+HEADER METRICS:
+  - Total Est. Stars (synced with Guild Overview Est. Stars via _lastPlanStars)
+  - Max possible stars (56 base + N bonus)
+  - Bonus planets unlocked count
+  - Operations platoons filled total
+
+ALGORITHM SELECTOR (dropdown):
+  Options:
+    - "All Algorithms (Best Result)" [default]
+    - "Genetic Algorithm"
+    - "Simulated Annealing"
+    - "Particle Swarm Optimization"
+    - "Adaptive Moment Estimation (Adam)"
+    - "Greedy Enumeration (Rule-Based)"
+
+PROGRESS FILL BUTTON:
+  The "Run Optimization" button itself fills with gold color as progress is made
+  Status line below shows: algorithm name, % complete, best score so far
+  When "All" selected: each algorithm gets 20% of the progress bar
+
+GENOME ENCODING:
+  Flat array of 18 integers: [d0_ds, d0_mx, d0_ls, d1_ds, d1_mx, d1_ls, ... d5_*]
+  6 days × 3 chains = 18 decisions
+  Gene values: 0=preload, 1=target 1★, 2=target 2★, 3=target 3★
+
+FITNESS FUNCTION (evalGenome):
+  Simulates all 6 days given a genome.
+  For each day:
+    - Compute mission points for each active chain planet
+    - Compute GP needed for each chain's target star tier
+    - PROPORTIONAL GP ALLOCATION: if total need > budget, each chain
+      gets share = (chain_need / total_need) × budget. No chain starved.
+    - Apply decisions: preload banks points (capped below 1-star threshold)
+      commit advances to next planet if ≥1 star achieved
+    - BONUS PLANETS: after main chains, spare GP goes to unlocked bonus planets
+      bonusUnlocked() returns true only if planet's SM count meets threshold
+      Bonus planet stars are included in the fitness score
+  Returns: integer total stars across all 6 days + bonus planets
+
+ALL 5 ALGORITHMS:
+
+  1. Greedy Enumeration (runGreedy):
+     Wraps existing runOptimizer() as a genome.
+     runOptimizer() enumerates all 64 daily combinations (4 options × 3 chains)
+     Uses lookahead (simulateFuture) to score each combination.
+     Provides the seed genome for all other algorithms.
+
+  2. Simulated Annealing (runSA):
+     ITERS=10,000, T0=120, Tf=0.05, geometric cooling
+     Starts from greedyGenome()
+     Perturbation: 2-4 genes when T > T0*0.5, else 1-2 genes
+     Accepts worse solutions with probability exp(delta/T)
+     Yields every 400 iterations for UI thread
+
+  3. Particle Swarm Optimization (runPSO):
+     SWARM=60 particles, ITERS=250
+     W=0.72 (inertia), C1=1.49 (cognitive), C2=1.49 (social)
+     Particles in continuous [0,3] space, quantized to int for evaluation
+     3 particles seeded near greedyGenome() for warm start
+     Velocity clamped to [-2, 2]
+
+  4. Genetic Algorithm (runGA):
+     POP=200, GENS=180, ELITE=8 (elitism), MUT=0.12 (mutation rate)
+     Uniform crossover between tournament-selected parents
+     Tournament size k=6
+     Occasional whole-day block mutation (5% chance)
+     First generation seeded with greedyGenome()
+
+  5. Adam AME (runAdam):
+     AGENTS=40, ITERS=350, LR=0.45, B1=0.9, B2=0.999, EPS=1e-8
+     Central-difference gradient: evaluates ±0.5 perturbations per gene
+     Gradient ascent (maximizing stars)
+     2 agents seeded near greedyGenome(), rest random
+
+  When "All" selected: Greedy → SA → PSO → GA → Adam run sequentially
+  Best genome by score is used for final display.
+
+ALGORITHM COMPARISON HEADER:
+  When multiple algorithms run, a gold-highlighted comparison box shows
+  each algorithm's best score. Winner is highlighted.
+
+DAY DISPLAY (renderOptPlan):
+  For each day 1-6:
+    - Planet name and chain alignment
+    - Status: "Preloading" (banked pts shown) or N-star commit
+    - GP available / GP used
+    - Stars earned that day
+    - Bonus planet results (spare GP applied)
+  Bonus planet notes shown below each day's chain cards.
+
+AUTO-RUN:
+  When navigating to Day-by-Day tab for the first time (empty output),
+  startOptimization() fires automatically.
+  Subsequent visits do not auto-run.
+
+KNOWN ISSUES / FUTURE WORK:
+  - The _lastPlanStars sync ensures Guild Overview matches, but is invalidated
+    on any settings change (ops toggle, stats change, falloff change).
+  - buildAIPrompt() function still exists in code (dead code — no longer called)
+    but doesn't harm anything. Safe to remove.
+
+═══════════════════════════════════════════════════════
+TAB 4: GUIDES (id="guides", panel="panel-guides")
+═══════════════════════════════════════════════════════
+
+PURPOSE: Store and display squad recommendations for each mission/combat
+mission on each planet. Cross-reference against a selected guild member's
+roster to check eligibility.
+
+LAYOUT: Two-pane
+  Left pane: Planet/mission list tree (collapsible by planet)
+  Right pane: Mission detail with squad cards
+
+PLANET/MISSION DATA (PLANET_MISSIONS object):
+  Each planet has: name, align (ds/mx/ls), phase, relic requirement, list of:
+    - CMs (combat missions 1-N)
+    - Fleet mission (if applicable)
+    - Special mission (if applicable)
+  Each mission has: id, label, type (cm/fleet/sm)
+
+SQUAD DATA STORAGE:
+  In-browser only: _squadsData[planet_id][mission_id] = [squad objects]
+  Each squad: {id, leader, members:[], difficulty, notes, videoUrl}
+  Export/Import via JSON button (guides saved to/loaded from local file)
+  
+SQUAD EDITOR (openSquadEditor):
+  Modal dialog for adding/editing squads
+  Fields: leader name, members (comma-separated), difficulty, notes, video URL
+  Unit datalist: ALL_CHAR_NAMES (270 chars) + SHIP_NAMES (70 ships) +
+                 any additional names from scanned rosters
+  Autocomplete dropdown on unit name inputs
+
+ROSTER CHECK SYSTEM (IMPLEMENTED):
+  Member selector dropdown in Guides tab
+  When a member is selected:
+    - checkRosterForSquad() resolves each squad member name → roster entry
+    - _nameToRosterUnit() searches guildRosters[ac] by display name match
+    - Each unit checked: 7★ required, relic ≥ planet.relic required
+    - Per-unit results: {name, ok, reason} array
+    - Squad header shows: "✓ Ready" or "✗ N missing" with full detail tooltip
+    - Member list: each unit colored green ✓ or red ✗ with hover tooltip
+    - "Update checks" called when member selection changes
+
+KNOWN ISSUES:
+  - Per-unit check relies on name→defId resolution via display name string
+    matching. If a character has a name mismatch (comlink vs display), the
+    check will incorrectly show as "Not in roster".
+  - No persistence of guides between app restarts (only JSON import/export)
+
+═══════════════════════════════════════════════════════
+TAB 5: ROSTER (id="roster", panel="panel-roster")
+═══════════════════════════════════════════════════════
+
+PURPOSE: View any guild member's full roster with filtering and sorting.
+
+MEMBER SELECTOR:
+  Dropdown of all scanned guild members (populated after scan)
+  Shows member name or ally code if name unavailable
+
+SEARCH/FILTER BAR:
+  Text search: matches display name or defId
+  Filter dropdown:
+    - All (default)
+    - Characters only (combatType ≠ 2)
+    - Ships only (combatType = 2)
+    - R5+ characters
+    - R7+ characters
+    - R9+ characters
+    - G12+ characters
+
+SUMMARY LINE:
+  Total units | R7+ count | R5+ count | Fastest speed (if available)
+  If speed is 0 for all units: shows "(re-scan for speed/zeta data)" hint
+
+SORT BUTTONS (click to sort, click again to reverse):
+  Name | Type | Stars | Level | Speed | Zetas | Omicrons
+
+COLLAPSIBLE SECTIONS:
+  Characters section (open by default)
+  Ships section (closed by default)
+
+ROSTER ROW COLUMNS:
+  Name | Type icon | Stars | Level/Relic | Speed | Zeta badge | Omicron badge
+  Zeta badge (Z3): hover shows tooltip with actual zeta ability names
+  Omicron badge (O2): hover shows tooltip with actual omicron ability names
+  Ability names sourced from UNIT_ABILITIES[defId]
+
+SHIP/CHARACTER DETECTION:
+  combatType from scan: Python sets it via _SHIP_DEFIDS check (103 defIds)
+  JS fallback: _SHIP_IDS set (~50 entries) in filterRoster()
+  Issue: some ships may still appear in character section if defId not in set
+
+KNOWN ISSUES:
+  - Speed is always 0. The /player endpoint returns unitStat: null.
+    Speed requires either:
+    a) The swgoh.gg private API (user working on access)
+    b) A separate /unitStatistics endpoint (not yet discovered/implemented)
+  - Zeta/omicron counts may show as 0 if purchasedAbilityId is empty.
+    Next scan log will show high_relic_purchased to confirm.
+  - Ship detection: equippedStatMod presence used as secondary check for
+    characters (ships don't have mods), but this isn't implemented in JS.
+  - Some ships show in the Characters section if their defId isn't in
+    the _SHIP_IDS set. The _SHIP_DEFIDS set in Python is larger than the
+    JS _SHIP_IDS set — these should be synchronized.
+
+SCAN LOG STRUCTURE (per member):
+  {
+    allyCode: "base64-or-numeric",
+    memberIndex: N,
+    status: "OK" or "FAILED",
+    units_stored: N,
+    units_skipped: N,
+    errors: [list of skip reasons],
+    sample_unit: {defId, name, rarity, gear, relic, combatType, speed, zetas, omicrons},
+    raw_unit_debug: {
+      all_keys: [list of all keys on first unit],
+      unitStat_raw: "None" or actual value,
+      stat_raw: "MISSING",
+      skill_first2: "[{id, tier}, {id, tier}]",
+      purchasedAbility: [] or [list],
+      currentTier_gear: N,
+      combatType: "MISSING",
+      equippedStatMod: "present" or "absent",
+      nameKey: "MISSING",
+      definitionId: "BASEUNIT:SEVEN_STAR",
+      high_relic_defId: "UNITNAME:SEVEN_STAR",
+      high_relic_purchased: [] or [list],
+      high_relic_skills: "[{id, tier}, ...]",
+      high_relic_tier: N
+    },
+    timestamp: "ISO datetime"
+  }
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 6 — PYTHON SERVER API ENDPOINTS
+────────────────────────────────────────────────────────────────────────────────
+
+All endpoints are HTTP POST (or GET where noted) on localhost:8080.
+Python handler class: HTTPRequestHandler(BaseHTTPRequestHandler)
+
+GET /api/status
+  Returns: {alive: bool, port: 3000, version: "v4.x"}
+  Checks if comlink is responsive. Auto-restarts if not.
+
+POST /api/guild-by-allycode
+  Body: {allyCode: "string"}
+  Logic:
+    - Strip hyphens only if numeric (preserves base64 hyphens)
+    - Try /player first to get playerId, then /guild with guildId
+  Returns: guild object from comlink or {error: "..."}
+
+POST /api/roster
+  Body: {allyCode: "base64-or-numeric"}
+  Logic:
+    - Detect if GUID vs numeric ally code
+    - For GUID: POST to comlink /player with {playerId: guid}
+    - For numeric: POST to comlink /player with {allyCode: numeric}
+    - 3 retries with 1s backoff
+    - Parse rosterUnit[] into simplified format
+    - Store in _guild_rosters[raw_allycode]
+    - Write to scan_log.json
+  Simplified unit format:
+    {defId, name, rarity, gear, relic, combatType, speed, zetas, omicrons}
+
+POST /api/fetch-unit-names
+  Tries (in order):
+    1. swgoh.gg/api/characters/ and /api/ships/
+    2. comlink /data segments 1,3,6,10,11,12
+    3. comlink /localization Loc_ENG_US.txt (UNIT_{ID}_NAME pattern)
+  Returns: {count, sources: [], errors: [], sample: {}, names: {}}
+  Merges into _unit_name_map for future scans
+
+POST /api/platoon-analysis
+  Body: {tbId: "..."}
+  Calls _analyze_platoons() which uses _fetch_tb_defs()
+  Returns territory battle platoon requirements vs guild rosters
+  Used by Platoon Analysis button in Guild Overview
+
+POST /api/comlink-health
+  Returns: {alive: bool, restarted: bool, proc_alive: bool}
+  Triggers restart if dead
+
+POST /api/debug-comlink
+  Returns raw response from comlink /player for first guild member
+
+POST /api/debug-roster-sample
+  Returns first 3 units from first scanned member (for field diagnosis)
+
+POST /api/dump-raw-comlink-unit
+  Body: {allyCode: "..."}
+  Returns ALL fields from first rosterUnit for a given member
+  Used for debugging new field names in comlink updates
+
+POST /api/log-scan-failure
+  Body: {allyCode, error, responseKeys}
+  Records failed scans to scan_log.json
+
+POST /api/reset-tb-cache
+  Clears cached TB platoon definitions
+
+GET /api/guild
+  Returns current stored guild data
+
+POST /api/tb-platoons
+  Returns TB platoon definitions from comlink game data
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 7 — KNOWN BUGS AND ISSUES (priority order)
+────────────────────────────────────────────────────────────────────────────────
+
+CRITICAL:
+  1. KEY_UNITS defIds are wrong in the JavaScript KEY_UNITS array:
+     - 'GRANDMASTER_YODA' → should be 'GRANDINQUISITOR'
+     - 'SITHPUREBLOOD' → should be 'LORDVADER'
+     - 'JEDIKNIGHTREVAN' (labeled "Darth Vader") → should be 'VADER'
+     - 'DARTHVADER' (labeled "Darth Vader (old)") → duplicate, remove
+     - 'JYNSO' → should be 'JYNERSO'
+     - 'BOKATAN' → should be 'MANDALORBOKATAN' (Bo-Katan Mand'alor)
+     These defIds don't match what comlink returns so counter is always 0.
+     The KEY_UNITS array must use the same Base IDs as in UNIT_NAMES.
+
+  2. Speed stat always 0:
+     The /player endpoint's unitStat field returns null for all units.
+     Speed is simply not available from this endpoint.
+     No known fix without swgoh.gg private API or a different comlink endpoint.
+
+  3. Zeta/omicron counts may be 0:
+     purchasedAbilityId returned as empty array for all members in last scan.
+     This might mean the basic /player endpoint doesn't include this field,
+     or the field exists only in a different API call format.
+     Skill tiers (tier ≥ 8 = zeta, tier ≥ 9 = omicron fallback) should help
+     but only if the skill data is structured that way.
+
+HIGH:
+  4. Ship classification incomplete:
+     The Python _SHIP_DEFIDS set has 103 entries.
+     The JavaScript _SHIP_IDS set has ~50 entries.
+     Ships not in the JS set appear in the Characters section of the Roster tab.
+     These sets should be synchronized — ideally one authoritative source.
+
+  5. "Fetch Unit Names" button fails:
+     Reports "could not fetch unit names from comlink" regardless of source.
+     The swgoh.gg public API may be blocking or rate-limiting.
+     The comlink localization approach (UNIT_DEFID_NAME pattern) is untested
+     but theoretically the correct approach.
+
+  6. Guides roster check name resolution:
+     _nameToRosterUnit() does string comparison of display names.
+     If a character's stored name (from scan) differs from UNIT_NAMES display
+     name (e.g., empty string vs "Magmatrooper"), the check incorrectly
+     shows "Not in roster". Needs defId-based matching instead.
+
+MEDIUM:
+  7. buildAIPrompt() function is dead code (AI integration removed but function
+     remains). Harmless but should be cleaned up.
+
+  8. Roster scan: the "name" field stored in simplified units is always empty
+     because comlink /player doesn't return nameKey.
+     defIdToName() is called at display time instead, which works correctly.
+     But _nameToRosterUnit() in guides relies on display name matching which
+     could fail if the character was stored without a resolved name.
+
+  9. Ops platoon fix (proportional GP): fixed for the optimizer's evalGenome
+     and simulateFuture functions. But the existing runOptimizer (greedy rule-
+     based) still uses a lookahead function (simulateFuture) that was updated.
+     Verify the greedy path uses the same proportional allocation.
+
+  10. _lastPlanStars shows "—" after any settings change, requiring a full
+      re-optimization run. The quick greedy fallback in calcSummary() could
+      provide a reasonable estimate while showing it as approximate.
+
+LOW:
+  11. No persistence of guide squads between app restarts.
+      Import/Export JSON works but requires manual action.
+      Could save to a file in the .comlink/ directory automatically.
+
+  12. The "Apply to Planet Planner" button in Guild Overview applies roster
+      scan rates but doesn't account for the fact that capability check uses
+      relic level while CM rate uses 7-star completion (different thresholds).
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 8 — COMPLETE SYSTEM FLOW (end-to-end)
+────────────────────────────────────────────────────────────────────────────────
+
+STARTUP FLOW:
+  1. User runs ROTE_Planner.exe
+  2. Python unpacks embedded comlink binary to temp directory
+  3. Python starts comlink on port 3000 with pipe drain threads
+  4. Python starts HTTP server on port 8080
+  5. Browser opens to http://localhost:8080
+  6. HTML/JS app loads; calls /api/status to check comlink
+  7. Watchdog thread starts (checks comlink every 15 seconds)
+
+GUILD IMPORT FLOW:
+  1. User enters ally code (their own or any guild member's)
+  2. JS calls /api/guild-by-allycode with ally code
+  3. Python strips hyphens (numeric only), sends to comlink /player
+  4. Gets playerId from player response, then sends to comlink /guild
+  5. Guild object returned: {guild: {name, gp, profile: [{playerId, allyCode, ...}]}}
+  6. JS displays guild name, member count, GP
+  7. Member ally codes stored for roster scanning
+
+ROSTER SCAN FLOW:
+  1. User clicks "Scan Rosters"
+  2. JS iterates all guild member ally codes
+  3. For each member: POST /api/roster with allyCode
+  4. Python determines if GUID or numeric, calls comlink /player
+  5. Response: {rosterUnit: [{definitionId, currentRarity, currentTier, ...}]}
+  6. Python parses each unit:
+     - defId = definitionId.split(":")[0]
+     - stars = currentRarity
+     - gear = currentTier  
+     - relic = max(0, relic.currentTier - 2) where relic.currentTier 1=off, 3=R1
+     - combatType = 2 if defId in _SHIP_DEFIDS else 1
+     - speed = 0 (unitStat is null)
+     - zetas/omicrons from purchasedAbilityId[] (may be empty)
+  7. Simplified roster stored in _guild_rosters[allyCode]
+  8. Debug info written to scan_log.json
+  9. After all members: updateDefaultsFromRosterScan() adjusts planet rates
+  10. populateMemberDropdown() updates Guides and Roster dropdowns
+
+OPTIMIZATION FLOW:
+  1. User configures Planet Planner (CM rates, fleet rates, ops, SMs, GP)
+  2. User selects algorithm(s) and clicks "Run Optimization"
+  3. startOptimization() runs selected algorithm(s) sequentially
+  4. Each algorithm calls evalGenome() for fitness, yields to UI thread
+  5. evalGenome() uses:
+     - gpForDay(d): guildGP × participationRate × (1 - undepRate)
+     - missionOnlyPts(pid): cm + fleet + ops points from pState
+     - bonusUnlocked(id): checks pState[unlockedBy].smCount ≥ threshold
+  6. Best genome selected by highest star count
+  7. simulateGenomeDetailed() runs best genome for display output
+  8. renderOptPlan() shows day-by-day breakdown
+  9. _lastPlanStars = totalStars (syncs to Guild Overview Est. Stars)
+  10. calcSummary() updates s-stars element
+
+GUIDES ROSTER CHECK FLOW:
+  1. User navigates to Guides tab
+  2. User selects a planet → mission (e.g., Mustafar → CM 1)
+  3. User selects a guild member from the member dropdown
+  4. renderGuideMission() renders squad cards
+  5. For each squad, checkRosterForSquad() called:
+     a. Gets planet.relic (required relic level)
+     b. For each member name in squad.members[]:
+        _nameToRosterUnit(name) searches guildRosters[selectedAc]
+        by matching defIdToName(unit.defId, unit.name).toLowerCase()
+     c. Checks: unit.rarity === 7 AND unit.relic >= planet.relic
+     d. Builds results[] with {name, ok, reason} per unit
+  6. Squad header shows: ✓ Ready or ✗ N missing (with full tooltip)
+  7. Member names in squad body individually colored ✓ green / ✗ red
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 9 — FUTURE WORK ITEMS (not yet implemented)
+────────────────────────────────────────────────────────────────────────────────
+
+HIGH PRIORITY:
+  1. swgoh.gg PRIVATE API INTEGRATION (user actively working on access)
+     - Will provide: speed stats, full character stats, mod data
+     - Format uses base_id and name fields (same as public API)
+     - Wire in as: primary data source for /api/roster endpoint
+     - Will also enable: proper speed display in Roster tab
+     - Speed stat is currently the #1 most missing piece of data
+
+  2. Fix KEY_UNITS defIds in JS (see KNOWN BUGS section 7, item 1)
+     The array needs to match exact comlink Base IDs from UNIT_NAMES table.
+     Correct defIds:
+       Grand Inquisitor → GRANDINQUISITOR
+       Lord Vader → LORDVADER
+       Darth Vader → VADER
+       Seventh Sister → SEVENTHSISTER (correct)
+       Third Sister → THIRDSISTER (correct)
+       Jyn Erso → JYNERSO
+       Cassian Andor → CASSIANANDOR (correct)
+       K-2SO → K2SO (correct)
+       Bo-Katan Mand'alor → MANDALORBOKATAN
+       Mando (Beskar) → THEMANDALORIANBESKARARMOR
+       Cal Kestis → JEDIKNIGHTCAL
+       Cere Junda → CEREJUNDA (correct)
+       Jabba the Hutt → JABBATHEHUTT (correct)
+       Fennec Shand → FENNECSHAND (correct)
+
+  3. Roster guides check: switch to defId-based matching instead of name
+     matching. Store defId in squad member entries, resolve display name
+     for UI. This eliminates false "Not in roster" results.
+
+MEDIUM PRIORITY:
+  4. Persistent guides storage: auto-save to .comlink/guides.json on change,
+     auto-load on startup. No more manual export/import required.
+
+  5. Full ship classification sync: synchronize Python _SHIP_DEFIDS (103 entries)
+     with JavaScript _SHIP_IDS (~50 entries). Use a single source of truth.
+     Best approach: ship detection by absence of equippedStatMod field
+     (characters always have mods; ships never do).
+
+  6. Ops platoon analysis: the /api/platoon-analysis endpoint and related
+     Python functions (_fetch_tb_defs, _analyze_platoons) exist but may not
+     be fully integrated into the UI. The "Platoon Analysis" button calls
+     runPlatoonAnalysis() which posts to /api/platoon-analysis.
+
+  7. Speed display: once swgoh.gg API is available, parse speed from
+     stats data. Speed is stat ID 5 (UNIT_STAT_SPEED) in comlink's stat format.
+
+  8. Ability-specific zeta/omicron counts: currently zeta count = number of
+     purchasedAbilityIds (from scan), but the display only shows a count.
+     Once zeta detection is confirmed working, cross-reference with
+     UNIT_ABILITIES to show which specific abilities are unlocked.
+
+  9. Roster platoon analysis page: given guild roster data and TB platoon
+     requirements (from /api/platoon-analysis), show which platoon slots
+     can be filled by which guild members. Currently the endpoint exists
+     but a rich UI for platoon assignment planning is missing.
+
+LOW PRIORITY:
+  10. Speed-based team sorting: currently speed column always shows "-".
+      Once speed is available, sort by speed descending by default.
+
+  11. Announced characters filter: ALL_CHAR_NAMES includes only current
+      characters. ANNOUNCED_CHARS = ['Cobb Vanth', 'KX Security Droid']
+      could be shown in a separate "coming soon" section.
+
+  12. Territory War (TW) support: similar architecture could support TW
+      planning. Different GP pools, different territory layouts.
+
+  13. Relic tier display in Guides check: currently shows "R3" etc. in
+      tooltip. Could show a more descriptive "Relic 3 (needs Relic 5)" style.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 10 — PLANET/TERRITORY GAME MECHANICS
+────────────────────────────────────────────────────────────────────────────────
+
+ROTE TB STRUCTURE:
+  6 days of play, 3 chains of planets
+  Dark Side chain: Mustafar → Geonosis → Dathomir → Med Station →
+                   Malachor → Death Star
+  Mixed chain:     Corellia → Felucia → Tatooine → Kessel → Vandor → Hoth
+  Light Side chain: Coruscant → Bracca → Kashyyyk → Lothal → Kafrene → Scarif
+  Bonus planets:   Mandalore, Zeffo (unlocked by SM completions)
+
+  Each day: one planet active per chain. Completing ≥1 star advances to next.
+  Preloading: deploying GP but not reaching 1-star carries points to next day.
+  Maximum stars: 56 (18 planets × 3 stars) + 6 (2 bonus × 3 stars) = 62 max
+
+STAR THRESHOLDS (from swgoh.wiki, per planet):
+  Each planet has 3 thresholds (total points needed for 1★/2★/3★).
+  Thresholds vary by planet's zone level.
+  Values are total guild-wide points (CM + Fleet + Ops + deployed GP).
+
+POINT SOURCES:
+  Combat Missions (CMs): each CM × number of completions × points per player
+    "Completion" = a guild member finished that CM that day
+    Points per player scales with zone level (200k to 1.15M per CM per player)
+  Fleet Missions: similar to CMs but with fleet-specific point values
+  Operations Platoons: each filled platoon adds a fixed point value
+    Up to 6 platoons per planet (buttons 1-6 in Planet Planner)
+    Point values: 10M (Z1) to 86.49M (Z6) per platoon
+  Deployment: guild members deploy GP from their characters/ships
+    Total deployable GP = guild GP × participation rate × (1 - undeployed %)
+    GP deploys to the territory where characters are placed
+
+SPECIAL MISSIONS:
+  Some planets have one special mission (SM) requiring specific character squads
+  SM completions count toward bonus planet unlock thresholds:
+    Tatooine Krayt Dragon SM: 25 completions → unlocks Mandalore
+    Bracca SM: 30 completions → unlocks Zeffo
+  SM counts are manually entered in the Planet Planner (not auto-calculated)
+
+RELIC REQUIREMENTS:
+  Each zone has a minimum relic level for effective CM participation:
+    Zone 1 (R5+), Zone 2 (R6+), Zone 3 (R7+), Zone 4 (R7+), 
+    Zone 5 (R7+), Zone 6 (R8+) — approximate, varies by mission type
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 11 — FILE STRUCTURE AND KEY CONSTANTS
+────────────────────────────────────────────────────────────────────────────────
+
+Python globals:
+  COMLINK_PORT = 3000
+  SERVER_PORT = 8080 (default, findable by port scan)
+  COMLINK_DIR = Path(".comlink") relative to exe
+  _guild_rosters = {} (thread-safe dict: allyCode → [simplified_units])
+  _rosters_lock = threading.RLock()
+  _unit_name_map = {} (loaded from unit_names.json if exists)
+  _tb_defs_cache = None (cached TB platoon definitions)
+  comlink_proc = None (subprocess.Popen handle)
+
+JavaScript globals:
+  guildRosters = {} (allyCode → [unit_objects])
+  _squadsData = {} (guides: pid → mid → [squad_objects])
+  pState = {} (planet planner state per planet id)
+  cmMode = 'pct' (or 'count')
+  undepMode = 'pct' (or 'flat')
+  dailyUndep = [0,0,0,0,0,0] (per-day undeployed amounts)
+  _lastPlanStars = null (last optimizer result, used by calcSummary)
+  _rosterData = [] (current member roster)
+  _rosterFiltered = [] (filtered/sorted subset)
+  _rosterSort = {key:'speed', dir:-1}
+  _optRunning = false (prevents concurrent optimization runs)
+  _activeGuide = null ({pid, mid} of currently viewed mission)
+  _editingSquad = null ({pid, mid, squadId} when editor is open)
+
+Key files written by the app:
+  .comlink/scan_log.json — per-member scan results and debug data
+  .comlink/unit_names.json — cached unit names from fetch-unit-names
+  .comlink/guides.json — NOT YET IMPLEMENTED (future)
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION 12 — STYLING AND UI FRAMEWORK
+────────────────────────────────────────────────────────────────────────────────
+
+CSS variables (dark theme, space aesthetic):
+  --bg:      #0a0b0f (main background)
+  --bg2:     #12141a (card background)
+  --bg3:     #191b24 (elevated elements)
+  --bg4:     #1e2130 (hover state)
+  --text:    #e8e8f0 (primary text)
+  --text2:   #8b90a8 (secondary text)
+  --text3:   #555a72 (muted text)
+  --gold:    #f0c040 (primary accent, buttons)
+  --gold2:   #c8a030 (secondary gold)
+  --ds:      #e05050 (dark side, error)
+  --mx:      #e08030 (mixed chain)
+  --ls:      #4090e0 (light side)
+  --bonus:   #a060e0 (bonus planets, purple)
+  --border:  #1e2130 (border)
+  --border2: #282d40 (lighter border)
+  --radius:  6px (border radius)
+
+Fonts:
+  Orbitron (Google Fonts) — headers, labels, numeric displays
+  Rajdhani (Google Fonts) — body, buttons, inputs
+  fallback: system-ui
+
+Navigation: 5 horizontal tabs across the top
+  Guild Overview | Planet Planner | Day-by-Day Plan | Guides | Roster
+
+================================================================================
+END OF DOCUMENT
+Generated from rote_planner_v6.py — 5,634 lines
+270 characters, 70 ships, 5 optimization algorithms, 13 API endpoints
+================================================================================

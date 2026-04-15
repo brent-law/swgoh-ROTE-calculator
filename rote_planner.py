@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Rise of the Empire — TB Planner
 Self-contained launcher: downloads swgoh-comlink, serves the web app, opens your browser.
@@ -20,6 +20,8 @@ import socket
 import urllib.request
 import urllib.error
 import unicodedata
+import base64
+import io
 import zipfile
 import tarfile
 import shutil
@@ -285,8 +287,6 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .sm-pbar{flex:1;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden}
 .sm-pfill{height:100%;background:var(--bonus);border-radius:2px;transition:width .3s}
 .sm-note{font-size:.65rem;color:var(--text3);margin-top:4px}
-.gp-deploy-row{display:flex;gap:6px;align-items:center;margin-bottom:8px}
-.gp-deploy-row input{flex:1}
 .gp-deploy-note{font-size:.68rem;color:var(--text3);white-space:nowrap}
 .pnote{font-size:.68rem;margin-top:5px}
 .pnote.maxed{color:var(--mx)}.pnote.need{color:var(--text3)}
@@ -295,13 +295,14 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .day-block{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:10px}
 .day-block-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .day-title{font-family:'Orbitron',monospace;font-size:.78rem;letter-spacing:.08em;color:var(--gold)}
-.day-chains-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.day-chains-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
 .day-chain{border-radius:var(--radius);padding:.75rem}
 .day-chain.ds{background:var(--ds-glow);border:1px solid var(--ds-dim)}
 .day-chain.mx{background:var(--mx-glow);border:1px solid var(--mx-dim)}
 .day-chain.ls{background:var(--ls-glow);border:1px solid var(--ls-dim)}
+.day-chain.bonus{background:var(--bonus-glow);border:1px solid var(--bonus-dim)}
 .day-chain-title{font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:5px}
-.day-chain.ds .day-chain-title{color:var(--ds)}.day-chain.mx .day-chain-title{color:var(--mx)}.day-chain.ls .day-chain-title{color:var(--ls)}
+.day-chain.ds .day-chain-title{color:var(--ds)}.day-chain.mx .day-chain-title{color:var(--mx)}.day-chain.ls .day-chain-title{color:var(--ls)}.day-chain.bonus .day-chain-title{color:#c39bd3}
 .day-planet-name{font-family:'Orbitron',monospace;font-size:.72rem;color:var(--text);margin-bottom:2px}
 .day-stars{font-size:.78rem;color:var(--gold);margin-bottom:2px}
 .day-action{font-size:.7rem;color:var(--text2);line-height:1.4}
@@ -401,7 +402,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
   <div style="display:flex;justify-content:space-between;align-items:flex-start">
     <div>
       <h1>⚔ Rise of the Empire — TB Planner</h1>
-      <div class="subtitle">Star Wars: Galaxy of Heroes · Territory Battle Calculator</div>
+      <div class="subtitle">Star Wars: Galaxy of Heroes | Territory Battle Calculator</div>
     </div>
     <div style="text-align:right;padding-top:4px">
       <div style="font-size:.68rem;color:var(--text2)">swgoh-comlink</div>
@@ -433,7 +434,6 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 
 <div class="main">
 
-<!-- ═══════════════════════════════ SETUP ═══════════════════════════════ -->
 <div class="panel active" id="panel-setup">
 
   <!-- Live Import via Comlink -->
@@ -460,7 +460,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="font-size:.8rem;font-weight:600;color:var(--text)" id="guild-name-display">—</div>
         <div style="display:flex;gap:8px">
-          <button class="btn" style="font-size:.62rem;padding:4px 10px" onclick="scanAndAnalyze()" id="scan-btn">🔍 Scan Rosters</button>
+          <button class="btn" style="font-size:.62rem;padding:4px 10px" onclick="scanAndAnalyze()" id="scan-btn">Scan Rosters</button>
           <div style="font-size:.72rem;color:var(--text2);font-family:'Orbitron',monospace" id="member-gp-display">—</div>
         </div>
       </div>
@@ -553,7 +553,6 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
   </div>
 </div>
 
-<!-- ═══════════════════════════════ PLANNER ══════════════════════════════ -->
 <div class="panel" id="panel-planner">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
     <div class="chain-select">
@@ -567,7 +566,6 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
   <div id="chain-ls" class="planet-chain" style="display:none"></div>
 </div>
 
-<!-- ═══════════════════════════════ DAY PLAN ═════════════════════════════ -->
 <div class="panel" id="panel-operations">
   <div class="metrics" id="ops-metrics">
     <div class="metric"><div class="metric-label">Projected Platoons</div><div class="metric-val green" id="ops-total-platoons">—</div></div>
@@ -594,7 +592,6 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
   </div>
 </div>
 
-<!-- ═══════════════════════════════ DAY PLAN ═════════════════════════════ -->
 <div class="panel" id="panel-dayplan">
   <div class="card dayplan-warning" id="dayplan-warning-card">
     <div class="dayplan-warning-head">
@@ -650,7 +647,6 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
   <div id="day-plan-output"></div>
 </div>
 
-<!-- ═══ GUIDES PANEL ═══ -->
 <div class="panel" id="panel-guides">
   <!-- Header: member selector + save/load -->
   <div style="display:flex;justify-content:space-between;align-items:center;
@@ -701,16 +697,17 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 
   <!-- Squad Editor Modal -->
   <div id="squad-editor-overlay"
-    style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;
-           display:none;align-items:center;justify-content:center">
-    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;
-                padding:1.5rem;width:min(560px,95vw);max-height:90vh;overflow-y:auto;
-                box-shadow:0 8px 40px rgba(0,0,0,.5)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    onclick="if(event.target===this) closeSquadEditor()"
+    style="position:fixed;inset:0;background:#060b14;z-index:40000;
+           display:none;align-items:flex-start;justify-content:center;padding:20px 14px;overflow-y:auto">
+    <div style="position:relative;background:#0f1627;border:1px solid rgba(255,255,255,.14);border-radius:12px;
+                padding:1.25rem 1.5rem 1.5rem;width:min(620px,100%);max-height:calc(100vh - 40px);overflow-y:auto;
+                box-shadow:0 18px 48px rgba(0,0,0,.58)">
+      <div style="position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;margin:0 -1.5rem 1rem;padding:1.1rem 1.5rem .9rem;background:#0f1627;border-bottom:1px solid rgba(255,255,255,.08)">
         <div style="font-family:'Orbitron',monospace;font-size:.85rem;letter-spacing:.08em;
                     color:var(--gold)" id="squad-editor-title">Add Squad</div>
         <button onclick="closeSquadEditor()"
-          style="background:transparent;border:none;color:var(--text3);font-size:1.2rem;cursor:pointer">&#x2715;</button>
+          style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#141d31;border:1px solid var(--border2);color:var(--text2);font-size:1rem;line-height:1;border-radius:50%;cursor:pointer;flex-shrink:0">&#x2715;</button>
       </div>
       <!-- Difficulty -->
       <div class="field" style="margin-bottom:.75rem">
@@ -732,26 +729,61 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
       </div>
       <!-- Members -->
       <div class="field" style="margin-bottom:.75rem">
-        <label id="se-members-label" style="font-size:.68rem">Other Members <span style="color:var(--text3)">(up to 4, one per line or comma-separated)</span></label>
-        <div id="se-type-hint" style="font-size:.62rem;color:var(--text3);margin:.2rem 0 .35rem">Start typing to narrow the list.</div>
-        <input id="se-m1" type="text" list="se-unit-list" placeholder="Member 2"
-          autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
-          style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
-                 padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box;margin-bottom:4px">
-        <input id="se-m2" type="text" list="se-unit-list" placeholder="Member 3"
-          autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
-          style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
-                 padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box;margin-bottom:4px">
-        <input id="se-m3" type="text" list="se-unit-list" placeholder="Member 4"
-          autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
-          style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
-                 padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box;margin-bottom:4px">
-        <input id="se-m4" type="text" list="se-unit-list" placeholder="Member 5"
-          autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
-          style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
-                 padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
-      
-        <datalist id="se-unit-list"></datalist></div>
+        <label id="se-members-label" style="font-size:.68rem">Other Members <span style="color:var(--text3)">(up to 4 unique units)</span></label>
+        <div id="se-type-hint" style="font-size:.62rem;color:var(--text3);margin:.2rem 0 .35rem">Start typing to narrow the list. Units must be unique within a squad.</div>
+        <div id="se-starting-label" style="display:none;font-size:.62rem;color:var(--gold);margin:.3rem 0 .25rem">Starting Ships (required)</div>
+        <div id="se-slot-wrap-1" style="margin-bottom:6px">
+          <div id="se-slot-label-1" style="font-size:.62rem;color:var(--text3);margin-bottom:2px">Member 2</div>
+          <input id="se-m1" type="text" list="se-unit-list" placeholder="Member 2"
+            autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
+            style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
+                   padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
+        </div>
+        <div id="se-slot-wrap-2" style="margin-bottom:6px">
+          <div id="se-slot-label-2" style="font-size:.62rem;color:var(--text3);margin-bottom:2px">Member 3</div>
+          <input id="se-m2" type="text" list="se-unit-list" placeholder="Member 3"
+            autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
+            style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
+                   padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
+        </div>
+        <div id="se-slot-wrap-3" style="margin-bottom:6px">
+          <div id="se-slot-label-3" style="font-size:.62rem;color:var(--text3);margin-bottom:2px">Member 4</div>
+          <input id="se-m3" type="text" list="se-unit-list" placeholder="Member 4"
+            autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
+            style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
+                   padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
+        </div>
+        <div id="se-reinforcement-label" style="display:none;font-size:.62rem;color:var(--text3);margin:.55rem 0 .25rem">Reinforcements (optional)</div>
+        <div id="se-slot-wrap-4" style="margin-bottom:6px">
+          <div id="se-slot-label-4" style="font-size:.62rem;color:var(--text3);margin-bottom:2px">Member 5</div>
+          <input id="se-m4" type="text" list="se-unit-list" placeholder="Member 5"
+            autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
+            style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
+                   padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
+        </div>
+        <div id="se-slot-wrap-5" style="display:none;margin-bottom:6px">
+          <div id="se-slot-label-5" style="font-size:.62rem;color:var(--text3);margin-bottom:2px">Reinforcement 1</div>
+          <input id="se-m5" type="text" list="se-unit-list" placeholder="Reinforcement 1"
+            autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
+            style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
+                   padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
+        </div>
+        <div id="se-slot-wrap-6" style="display:none;margin-bottom:6px">
+          <div id="se-slot-label-6" style="font-size:.62rem;color:var(--text3);margin-bottom:2px">Reinforcement 2</div>
+          <input id="se-m6" type="text" list="se-unit-list" placeholder="Reinforcement 2"
+            autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
+            style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
+                   padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
+        </div>
+        <div id="se-slot-wrap-7" style="display:none">
+          <div id="se-slot-label-7" style="font-size:.62rem;color:var(--text3);margin-bottom:2px">Reinforcement 3</div>
+          <input id="se-m7" type="text" list="se-unit-list" placeholder="Reinforcement 3"
+            autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
+            style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
+                   padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
+        </div>
+        <datalist id="se-unit-list"></datalist>
+      </div>
       <!-- Notes -->
       <div class="field" style="margin-bottom:.75rem">
         <label style="font-size:.68rem">Notes / Strategy</label>
@@ -785,7 +817,6 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
   </div>
 </div>
 
-<!-- ═══ ROSTER PANEL ═══ -->
 <div class="panel" id="panel-roster">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
     <div style="flex:1;min-width:200px">
@@ -839,9 +870,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════════
 // DATA
-// ═══════════════════════════════════════════════════════════════════
 // ── Mission point values verified from swgoh.wiki + gaming-fans.com ──
 // cmPts:    territory points per player per FULL CM completion (both waves)
 // fleetPts: territory points per player per fleet mission completion
@@ -1129,11 +1158,11 @@ const KEY_UNITS = [
 
 // Per-planet state
 const pState={};
-ALL_PLANETS.forEach(p=>{pState[p.id]={cmRateOverride:null,fleetRateOverride:null,cmCountOverride:null,fleetCountOverride:null,ops:[false,false,false,false,false,false],smCount:0,gpDeploy:0,preloaded:0};});
+ALL_PLANETS.forEach(p=>{pState[p.id]={cmRateOverride:null,fleetRateOverride:null,cmCountOverride:null,fleetCountOverride:null,ops:[false,false,false,false,false,false],smReady:false,smCount:0,gpDeploy:0,preloaded:0};});
 const dailyUndep=Array(6).fill(0);
 let undepMode='pct',cmMode='pct';
 let guildRosters={};  // allyCode -> simplified roster
-const APP_STATE_VERSION = 4;
+const APP_STATE_VERSION = 5;
 const NAV_TABS = ['setup','planner','dayplan','operations','guides','roster'];
 const OPS_MEMBER_DAILY_CAP = 10;
 const OPTIMIZER_ALGO_META = {
@@ -1279,9 +1308,7 @@ function confirmOptimizerWarning(){
   queueSaveAppState();
 }
 
-// ═══════════════════════════════════════════════════════════════════
 // COMLINK STATUS
-// ═══════════════════════════════════════════════════════════════════
 
 // ── GUIDE SYSTEM ──────────────────────────────────────────────────────────────
 
@@ -1567,6 +1594,10 @@ function renderGuideMission(pid, mid){
   const squads = _getSquads(pid, mid);
   const alignClr = {ds:'var(--ds)',mx:'var(--mx)',ls:'var(--ls)'}[planet.align]||'var(--text)';
   const typeLabel = mission.type==='sm'?'Special Mission':mission.type==='fleet'?'Fleet Mission':'Combat Mission';
+  const isFleetMission = mission.type === 'fleet';
+  const missionRequirementLabel = isFleetMission
+    ? ('Phase '+planet.phase+' &middot; 7-star ships required')
+    : ('Phase '+planet.phase+' &middot; R'+planet.relic+'+ required');
 
   // Member roster check helper
   const selectedAc = document.getElementById('guide-member-sel')?.value||'';
@@ -1575,30 +1606,94 @@ function renderGuideMission(pid, mid){
   function checkRosterForSquad(squad){
     if(!memberRoster) return null; // no member selected
     const relic = planet.relic;
-    const members = (squad.members||[])
-      .map((name, idx)=>({
-        name: String(name||'').trim(),
-        defId: normalizeDefId((squad.memberDefIds||[])[idx]).toUpperCase()
-      }))
-      .filter(member=>member.name);
-    if(!members.length) return null; // empty squad, no check
+    const rawMembers = (squad.members||[]).slice(0, isFleetMission ? GUIDE_FLEET_MEMBER_INPUT_IDS.length : GUIDE_STANDARD_MEMBER_INPUT_IDS.length);
+    const rawMemberDefIds = Array.isArray(squad.memberDefIds) ? squad.memberDefIds : [];
+    const entries = [];
+    const leaderName = String(squad.leader||'').trim();
+    const leaderDefId = normalizeDefId(squad.leaderDefId).toUpperCase();
+    if(leaderName || rawMembers.length){
+      entries.push({
+        slot:'leader',
+        label:isFleetMission ? 'Capital Ship' : 'Leader',
+        name:leaderName,
+        defId:leaderDefId,
+        required:true
+      });
+    }
 
-    const results = members.map(member=>{
-      const ru = findRosterUnitByRef(memberRoster, member.name, member.defId);
-      if(!ru) return {name:member.name, ok:false, reason:'Not in roster', defId:member.defId};
-      if(Number(ru.rarity)<7) return {name:member.name, ok:false, reason:'Not 7★', defId:member.defId};
-      if(Number(ru.relic)<relic) return {
-        name: member.name,
-        ok: false,
-        reason: 'R'+(ru.relic||0)+' (need R'+relic+')',
-        defId: member.defId
+    if(isFleetMission){
+      GUIDE_FLEET_STARTER_INPUT_IDS.forEach((id, idx)=>{
+        entries.push({
+          slot:'starter',
+          label:'Starter '+(idx+1),
+          name:String(rawMembers[idx]||'').trim(),
+          defId:normalizeDefId(rawMemberDefIds[idx]).toUpperCase(),
+          required:true
+        });
+      });
+      GUIDE_FLEET_REINFORCEMENT_INPUT_IDS.forEach((id, offset)=>{
+        const idx = offset + GUIDE_FLEET_STARTER_INPUT_IDS.length;
+        const name = String(rawMembers[idx]||'').trim();
+        if(!name) return;
+        entries.push({
+          slot:'reinforcement',
+          label:'Reinforcement '+(offset+1),
+          name,
+          defId:normalizeDefId(rawMemberDefIds[idx]).toUpperCase(),
+          required:false
+        });
+      });
+    } else {
+      rawMembers.forEach((name, idx)=>{
+        const trimmed = String(name||'').trim();
+        if(!trimmed) return;
+        entries.push({
+          slot:'member',
+          label:'Member '+(idx+1),
+          name:trimmed,
+          defId:normalizeDefId(rawMemberDefIds[idx]).toUpperCase(),
+          required:true
+        });
+      });
+    }
+
+    if(!entries.length) return null; // empty squad, no check
+
+    const results = entries.map(entry=>{
+      if(!entry.name){
+        return {
+          ...entry,
+          ok:false,
+          reason:isFleetMission ? 'No ship assigned' : 'No unit assigned'
+        };
+      }
+      if(isFleetMission && entry.slot === 'leader' && !_isCapitalShipRef(entry.defId || entry.name)){
+        return {...entry, ok:false, reason:'Not a capital ship'};
+      }
+      if(isFleetMission && entry.slot !== 'leader' && _isCapitalShipRef(entry.defId || entry.name)){
+        return {...entry, ok:false, reason:'Capital ships can only be leaders'};
+      }
+      const ru = findRosterUnitByRef(memberRoster, entry.name, entry.defId);
+      if(!ru) return {...entry, ok:false, reason:'Not in roster'};
+      if(Number(ru.rarity)<7) return {...entry, ok:false, reason:'Not 7-star'};
+      if(!isFleetMission && Number(ru.relic)<relic) return {
+        ...entry,
+        ok:false,
+        reason:'R'+(ru.relic||0)+' (need R'+relic+')'
       };
-      return {name:member.name, ok:true, reason:'R'+ru.relic, defId:member.defId};
+      return {
+        ...entry,
+        ok:true,
+        reason:isFleetMission ? '7-star ready' : ('R'+ru.relic)
+      };
     });
 
     const allOk = results.every(r=>r.ok);
     const failCount = results.filter(r=>!r.ok).length;
-    const tip = results.map(r=>(r.ok?'✓ ':'✗ ')+r.name+' ('+r.reason+')').join('\n');
+    const tip = results.map(r=>{
+      const nameText = r.name ? (' - '+r.name) : '';
+      return (r.ok?'✓ ':'✗ ')+r.label+nameText+' ('+r.reason+')';
+    }).join('\n');
     return {ok:allOk, reason:tip, results, failCount};
   }
 
@@ -1615,7 +1710,7 @@ function renderGuideMission(pid, mid){
   html += '<div>';
   html += '<div style="font-family:\'Orbitron\',monospace;font-size:.85rem;letter-spacing:.06em;color:var(--text)">'+
     escHtml(planet.name)+' — '+escHtml(mission.label)+'</div>';
-  html += '<div style="font-size:.65rem;color:'+alignClr+';margin-top:2px">'+typeLabel+' · Phase '+planet.phase+' · R'+planet.relic+'+ required</div>';
+  html += '<div style="font-size:.65rem;color:'+alignClr+';margin-top:2px">'+typeLabel+' &middot; '+missionRequirementLabel+'</div>';
   html += '</div>';
   html += '<button onclick="openSquadEditor(\''+pid+'\',\''+mid+'\',null)" '+
     'style="font-size:.7rem;padding:5px 14px;border:1px solid var(--gold2);background:var(--gold);'+
@@ -1636,8 +1731,23 @@ function renderGuideMission(pid, mid){
           ? '<span title="'+escHtml(rCheck.reason)+'" style="color:#2ecc71;font-size:.85rem;cursor:help">&#10003; Ready</span>'
           : '<span title="'+escHtml(rCheck.reason)+'" style="color:#e74c3c;font-size:.85rem;cursor:help">&#10007; '+rCheck.failCount+' missing</span>';
 
-      const members = (squad.members||[]).filter(m=>m.trim());
+      const members = (squad.members||[]).slice(0, isFleetMission ? GUIDE_FLEET_MEMBER_INPUT_IDS.length : GUIDE_STANDARD_MEMBER_INPUT_IDS.length);
       const squadId = squad.id;
+      const resultList = Array.isArray(rCheck?.results) ? rCheck.results : [];
+      const leaderResult = resultList.find(r=>r.slot==='leader') || null;
+      const starterResults = resultList.filter(r=>r.slot==='starter');
+      const reinforcementResults = resultList.filter(r=>r.slot==='reinforcement');
+      const memberResults = resultList.filter(r=>r.slot==='member');
+
+      function renderGuideUnitResult(result, fallbackName){
+        if(!result){
+          return '<span style="color:var(--text3)">'+escHtml(fallbackName || 'Unassigned')+'</span>';
+        }
+        const clr = result.ok ? '#2ecc71' : '#e74c3c';
+        const icon = result.ok ? '✓' : '✗';
+        const text = result.name || 'Missing assignment';
+        return '<span title="'+escHtml(result.reason)+'" style="color:'+clr+';cursor:help">'+icon+' '+escHtml(result.label)+': '+escHtml(text)+'</span>';
+      }
 
       html += '<div style="margin-bottom:10px;border:1px solid '+ds.border+';border-radius:8px;'+
         'background:'+ds.bg+';overflow:hidden">';
@@ -1654,16 +1764,35 @@ function renderGuideMission(pid, mid){
 
       // Squad body (collapsible)
       html += '<div id="sq-body-'+squadId+'" style="display:none;border-top:1px solid '+ds.border+';padding:8px 10px">';
-      if(members.length){
-        // Build per-unit status if roster is available
-        const memberHtml = members.map(name=>{
-          if(!rCheck||!rCheck.results) return '<span>'+escHtml(name)+'</span>';
-          const ur = rCheck.results.find(r=>r.name===name);
-          if(!ur) return '<span style="color:var(--text3)">'+escHtml(name)+'</span>';
-          const clr = ur.ok ? '#2ecc71' : '#e74c3c';
-          const icon = ur.ok ? '✓' : '✗';
-          return '<span title="'+escHtml(ur.reason)+'" style="color:'+clr+';cursor:help">'+icon+' '+escHtml(name)+'</span>';
-        }).join(', ');
+      if(squad.leader){
+        html += '<div style="font-size:.72rem;color:var(--text2);margin-bottom:4px">'+
+          '<span style="color:var(--text3)">'+(isFleetMission ? 'Capital: ' : 'Leader: ')+'</span>'+
+          (rCheck ? renderGuideUnitResult(leaderResult, squad.leader) : '<span>'+escHtml(squad.leader)+'</span>')+
+          '</div>';
+      }
+      if(isFleetMission){
+        const starterFallbacks = GUIDE_FLEET_STARTER_INPUT_IDS.map((id, idx)=>String(members[idx]||'').trim()).filter((name, idx)=>name || starterResults[idx]);
+        if(starterFallbacks.length || starterResults.length){
+          const starterHtml = (starterResults.length ? starterResults : starterFallbacks.map((name, idx)=>({label:'Starter '+(idx+1), name})))
+            .map((entry, idx)=>rCheck ? renderGuideUnitResult(entry, starterFallbacks[idx]) : '<span>'+escHtml(entry.name || ('Starter '+(idx+1)))+'</span>')
+            .join(', ');
+          html += '<div style="font-size:.72rem;color:var(--text2);margin-bottom:4px">'+
+            '<span style="color:var(--text3)">Starting: </span>'+starterHtml+'</div>';
+        }
+        if(reinforcementResults.length || members.slice(3).some(name=>String(name||'').trim())){
+          const reinforcementFallbacks = members.slice(3).map(name=>String(name||'').trim()).filter(Boolean);
+          const reinforcementHtml = (rCheck ? reinforcementResults : reinforcementFallbacks.map((name, idx)=>({label:'Reinforcement '+(idx+1), name})))
+            .map((entry, idx)=>rCheck ? renderGuideUnitResult(entry, reinforcementFallbacks[idx]) : '<span>'+escHtml(entry.name)+'</span>')
+            .join(', ');
+          if(reinforcementHtml){
+            html += '<div style="font-size:.72rem;color:var(--text2);margin-bottom:4px">'+
+              '<span style="color:var(--text3)">Reinforcements: </span>'+reinforcementHtml+'</div>';
+          }
+        }
+      } else if(members.length){
+        const memberHtml = (rCheck ? memberResults : members.filter(name=>String(name||'').trim()).map((name, idx)=>({label:'Member '+(idx+1), name})))
+          .map((entry, idx)=>rCheck ? renderGuideUnitResult(entry, members[idx]) : '<span>'+escHtml(entry.name)+'</span>')
+          .join(', ');
         html += '<div style="font-size:.72rem;color:var(--text2);margin-bottom:4px">'+
           '<span style="color:var(--text3)">Members: </span>'+memberHtml+'</div>';
       }
@@ -1720,16 +1849,76 @@ function _getGuideMissionUnitGroup(pid, mid){
   return mission?.type === 'fleet' ? 'ships' : 'chars';
 }
 
-function _collectGuideEditorOptions(group){
+const GUIDE_STANDARD_MEMBER_INPUT_IDS = ['se-m1','se-m2','se-m3','se-m4'];
+const GUIDE_FLEET_MEMBER_INPUT_IDS = ['se-m1','se-m2','se-m3','se-m4','se-m5','se-m6','se-m7'];
+const GUIDE_FLEET_STARTER_INPUT_IDS = ['se-m1','se-m2','se-m3'];
+const GUIDE_FLEET_REINFORCEMENT_INPUT_IDS = ['se-m4','se-m5','se-m6','se-m7'];
+const CAPITAL_SHIP_DEFIDS = new Set([
+  'CAPITALCHIMAERA','CHIMAERA',
+  'CAPITALEXECUTOR','EXECUTOR',
+  'CAPITALEXECUTRIX','EXECUTRIX',
+  'CAPITALFINALIZER','FINALIZER',
+  'CAPITALJEDICRUISER','ENDURANCE',
+  'CAPITALLEVIATHAN','LEVIATHAN',
+  'CAPITALMALEVOLENCE','MALEVOLENCE',
+  'CAPITALMONCALAMARICRUISER','HOMEONE',
+  'CAPITALNEGOTIATOR','NEGOTIATOR',
+  'CAPITALPROFUNDITY','PROFUNDITY',
+  'CAPITALRADDUS','RADDUS',
+  'CAPITALSTARDESTROYER','EXECUTRIX'
+].map(defIdKey));
+
+function _isGuideFleetMission(pid, mid){
+  return _getGuideMissionMeta(pid, mid)?.type === 'fleet';
+}
+
+function _getGuideEditorMemberInputIds(pid, mid){
+  return _isGuideFleetMission(pid, mid) ? GUIDE_FLEET_MEMBER_INPUT_IDS : GUIDE_STANDARD_MEMBER_INPUT_IDS;
+}
+
+function _guideUnitSelectionKey(name, defId=''){
+  const resolvedDefId = normalizeDefId(defId || resolveUnitNameToDefId(name)).toUpperCase();
+  if(resolvedDefId) return 'DEF:'+resolvedDefId;
+  const normalizedName = normalizeUnitName(name);
+  return normalizedName ? ('NAME:'+normalizedName) : '';
+}
+
+function _isCapitalShipRef(nameOrDefId){
+  const key = defIdKey(resolveUnitNameToDefId(nameOrDefId) || nameOrDefId);
+  return CAPITAL_SHIP_DEFIDS.has(key);
+}
+
+function _getGuideEditorTakenKeys(exemptInputId=''){
+  const taken = new Set();
+  if(!_editingSquad) return taken;
+  const ids = ['se-leader'].concat(_getGuideEditorMemberInputIds(_editingSquad.pid, _editingSquad.mid));
+  ids.forEach(id=>{
+    if(id === exemptInputId) return;
+    const value = String(document.getElementById(id)?.value || '').trim();
+    const key = _guideUnitSelectionKey(value);
+    if(key) taken.add(key);
+  });
+  return taken;
+}
+
+function _collectGuideEditorOptions(group, role='member', exemptInputId=''){
   rebuildUnitNameIndex();
   const seen = new Set();
   const opts = [];
   const wantShips = group === 'ships';
+  const leaderOnlyCapitalShips = wantShips && role === 'leader';
+  const memberExcludesCapitalShips = wantShips && role !== 'leader';
+  const takenKeys = _getGuideEditorTakenKeys(exemptInputId);
 
   Object.entries(PLAYABLE_NAME_BY_DEFID).forEach(([defId, name])=>{
     if(!name || name === '(unknown)') return;
-    const isShip = KNOWN_SHIP_DEFIDS.has(defIdKey(defId));
+    const key = defIdKey(defId);
+    const isShip = KNOWN_SHIP_DEFIDS.has(key);
     if(isShip !== wantShips) return;
+    const isCapitalShip = CAPITAL_SHIP_DEFIDS.has(key);
+    if(leaderOnlyCapitalShips && !isCapitalShip) return;
+    if(memberExcludesCapitalShips && isCapitalShip) return;
+    if(takenKeys.has(_guideUnitSelectionKey(name, defId))) return;
     if(seen.has(name)) return;
     seen.add(name);
     opts.push(name);
@@ -1739,6 +1928,11 @@ function _collectGuideEditorOptions(group){
     const name = defIdToName((unit.defId||'').split(':')[0], unit.name);
     if(!name || name === '(unknown)' || seen.has(name)) return;
     if(isShipUnit(unit) !== wantShips) return;
+    const unitDefId = normalizeDefId(unit?.defId);
+    const isCapitalShip = CAPITAL_SHIP_DEFIDS.has(defIdKey(unitDefId));
+    if(leaderOnlyCapitalShips && !isCapitalShip) return;
+    if(memberExcludesCapitalShips && isCapitalShip) return;
+    if(takenKeys.has(_guideUnitSelectionKey(name, unitDefId))) return;
     seen.add(name);
     opts.push(name);
   }));
@@ -1760,11 +1954,12 @@ function _rankGuideEditorOptions(options, query){
   return starts.concat(contains).slice(0, 80);
 }
 
-function _buildUnitDatalist(pid, mid, query=''){
+function _buildUnitDatalist(pid, mid, query='', inputId='se-leader'){
   const dl=document.getElementById('se-unit-list');
   if(!dl)return;
   const group = _getGuideMissionUnitGroup(pid, mid);
-  const opts = _rankGuideEditorOptions(_collectGuideEditorOptions(group), query);
+  const role = inputId === 'se-leader' ? 'leader' : 'member';
+  const opts = _rankGuideEditorOptions(_collectGuideEditorOptions(group, role, inputId), query);
   dl.innerHTML=opts.map(n=>`<option value="${escHtml(n)}">`).join('');
 }
 
@@ -1774,44 +1969,80 @@ function _configureSquadEditorForMission(pid, mid){
   const leaderLabel = document.getElementById('se-leader-label');
   const membersLabel = document.getElementById('se-members-label');
   const typeHint = document.getElementById('se-type-hint');
+  const startingLabel = document.getElementById('se-starting-label');
+  const reinforcementLabel = document.getElementById('se-reinforcement-label');
   const leaderInput = document.getElementById('se-leader');
-  const memberPlaceholders = isFleet
-    ? ['Ship 2', 'Ship 3', 'Ship 4', 'Ship 5']
-    : ['Member 2', 'Member 3', 'Member 4', 'Member 5'];
+  const slotConfigs = isFleet
+    ? [
+        {id:'se-m1', label:'Starting Ship 1', placeholder:'e.g. Darth Vader\'s TIE Advanced x1', visible:true},
+        {id:'se-m2', label:'Starting Ship 2', placeholder:'Starting Ship 2', visible:true},
+        {id:'se-m3', label:'Starting Ship 3', placeholder:'Starting Ship 3', visible:true},
+        {id:'se-m4', label:'Reinforcement 1', placeholder:'Reinforcement 1', visible:true},
+        {id:'se-m5', label:'Reinforcement 2', placeholder:'Reinforcement 2', visible:true},
+        {id:'se-m6', label:'Reinforcement 3', placeholder:'Reinforcement 3', visible:true},
+        {id:'se-m7', label:'Reinforcement 4', placeholder:'Reinforcement 4', visible:true},
+      ]
+    : [
+        {id:'se-m1', label:'Member 2', placeholder:'Member 2', visible:true},
+        {id:'se-m2', label:'Member 3', placeholder:'Member 3', visible:true},
+        {id:'se-m3', label:'Member 4', placeholder:'Member 4', visible:true},
+        {id:'se-m4', label:'Member 5', placeholder:'Member 5', visible:true},
+        {id:'se-m5', label:'', placeholder:'', visible:false},
+        {id:'se-m6', label:'', placeholder:'', visible:false},
+        {id:'se-m7', label:'', placeholder:'', visible:false},
+      ];
 
   if(leaderLabel){
     leaderLabel.innerHTML = isFleet
-      ? 'Primary Ship <span style="color:var(--text3)">(ship name)</span>'
+      ? 'Capital Ship Leader <span style="color:var(--text3)">(capital ship name)</span>'
       : 'Squad Leader <span style="color:var(--text3)">(character name)</span>';
   }
   if(membersLabel){
     membersLabel.innerHTML = isFleet
-      ? 'Other Ships <span style="color:var(--text3)">(up to 4, one per line or comma-separated)</span>'
-      : 'Other Members <span style="color:var(--text3)">(up to 4, one per line or comma-separated)</span>';
+      ? 'Fleet Ships <span style="color:var(--text3)">(3 starters required, up to 4 reinforcements optional)</span>'
+      : 'Other Members <span style="color:var(--text3)">(up to 4 unique characters)</span>';
   }
   if(typeHint){
-    const typeText = isFleet ? 'ships only' : 'characters only';
-    typeHint.textContent = 'Start typing to narrow the list. This mission accepts '+typeText+'.';
+    typeHint.textContent = isFleet
+      ? 'Start typing to narrow the list. Fleet guides require 1 capital ship leader, 3 starting ships, and may add up to 4 reinforcements. Units must be unique.'
+      : 'Start typing to narrow the list. This mission accepts characters only, and each unit can only appear once in the squad.';
   }
   if(leaderInput){
-    leaderInput.placeholder = isFleet ? 'e.g. Executor' : 'e.g. Sith Eternal Emperor';
+    leaderInput.placeholder = isFleet ? 'e.g. Leviathan' : 'e.g. Sith Eternal Emperor';
   }
-  ['se-m1','se-m2','se-m3','se-m4'].forEach((id, idx)=>{
-    const input = document.getElementById(id);
-    if(input) input.placeholder = memberPlaceholders[idx];
+  if(startingLabel) startingLabel.style.display = isFleet ? 'block' : 'none';
+  if(reinforcementLabel) reinforcementLabel.style.display = isFleet ? 'block' : 'none';
+
+  slotConfigs.forEach((cfg, idx)=>{
+    const input = document.getElementById(cfg.id);
+    const wrap = document.getElementById('se-slot-wrap-'+(idx+1));
+    const slotLabel = document.getElementById('se-slot-label-'+(idx+1));
+    if(wrap) wrap.style.display = cfg.visible ? 'block' : 'none';
+    if(slotLabel) slotLabel.textContent = cfg.label;
+    if(input) input.placeholder = cfg.placeholder;
   });
 }
 
 function refreshSquadEditorSuggestions(input){
   if(!_editingSquad) return;
   const query = typeof input === 'string' ? input : (input?.value || '');
-  _buildUnitDatalist(_editingSquad.pid, _editingSquad.mid, query);
+  const inputId = typeof input === 'string' ? 'se-leader' : (input?.id || 'se-leader');
+  _buildUnitDatalist(_editingSquad.pid, _editingSquad.mid, query, inputId);
+}
+
+function ensureSquadEditorPortal(){
+  const overlay = document.getElementById('squad-editor-overlay');
+  if(!overlay) return null;
+  if(overlay.parentElement !== document.body){
+    document.body.appendChild(overlay);
+  }
+  return overlay;
 }
 
 function openSquadEditor(pid, mid, squadId){
   _editingSquad = {pid, mid, squadId};
   _configureSquadEditorForMission(pid, mid);
-  _buildUnitDatalist(pid, mid, '');
+  _buildUnitDatalist(pid, mid, '', 'se-leader');
   const isEdit = squadId !== null;
 
   document.getElementById('squad-editor-title').textContent = isEdit ? 'Edit Squad' : 'Add Squad';
@@ -1821,7 +2052,7 @@ function openSquadEditor(pid, mid, squadId){
     if(!squad) return;
     document.getElementById('se-leader').value = squad.leader||'';
     const mems = squad.members||[];
-    ['se-m1','se-m2','se-m3','se-m4'].forEach((id,i)=>{
+    GUIDE_FLEET_MEMBER_INPUT_IDS.forEach((id,i)=>{
       document.getElementById(id).value = mems[i]||'';
     });
     document.getElementById('se-notes').value  = squad.notes||'';
@@ -1829,14 +2060,15 @@ function openSquadEditor(pid, mid, squadId){
     selectDiff(squad.difficulty||'auto');
   } else {
     document.getElementById('se-leader').value = '';
-    ['se-m1','se-m2','se-m3','se-m4'].forEach(id=>{ document.getElementById(id).value=''; });
+    GUIDE_FLEET_MEMBER_INPUT_IDS.forEach(id=>{ document.getElementById(id).value=''; });
     document.getElementById('se-notes').value = '';
     document.getElementById('se-video').value = '';
     selectDiff('auto');
   }
 
-  const ov = document.getElementById('squad-editor-overlay');
+  const ov = ensureSquadEditorPortal();
   if(ov){ ov.style.display='flex'; }
+  document.body.style.overflow = 'hidden';
   setTimeout(()=>{
     refreshSquadEditorSuggestions(document.getElementById('se-leader'));
     document.getElementById('se-leader').focus();
@@ -1847,6 +2079,7 @@ function closeSquadEditor(){
   const ov = document.getElementById('squad-editor-overlay');
   if(ov){ ov.style.display='none'; }
   _editingSquad = null;
+  document.body.style.overflow = '';
 }
 
 function selectDiff(d){
@@ -1880,7 +2113,9 @@ function _genId(){
 function saveSquadEditor(){
   if(!_editingSquad) return;
   const {pid, mid, squadId} = _editingSquad;
-  const expectedCombatType = _getGuideMissionUnitGroup(pid, mid) === 'ships' ? 2 : 1;
+  const isFleetMission = _getGuideMissionUnitGroup(pid, mid) === 'ships';
+  const expectedCombatType = isFleetMission ? 2 : 1;
+  const memberInputIds = _getGuideEditorMemberInputIds(pid, mid);
 
   const leader = document.getElementById('se-leader').value.trim();
   if(!leader){ alert('Squad leader name is required.'); return; }
@@ -1891,15 +2126,50 @@ function saveSquadEditor(){
       : 'Combat and special missions can only use character names.');
     return;
   }
+  if(isFleetMission && !_isCapitalShipRef(leaderDefId || leader)){
+    alert('Fleet mission leaders must be capital ships.');
+    return;
+  }
 
-  const members = ['se-m1','se-m2','se-m3','se-m4']
-    .map(id=>document.getElementById(id).value.trim()).filter(Boolean);
-  const memberDefIds = members.map(name=>resolveUnitNameToDefId(name));
+  const rawMembers = memberInputIds.map(id=>document.getElementById(id).value.trim());
+  if(isFleetMission && rawMembers.slice(0, GUIDE_FLEET_STARTER_INPUT_IDS.length).some(name=>!name)){
+    alert('Fleet guides require 3 starting ships before they can be saved.');
+    return;
+  }
+  const members = rawMembers.slice();
+  const memberDefIds = rawMembers.map(name=>name ? resolveUnitNameToDefId(name) : '');
   const invalidMember = memberDefIds.find(defId=>defId && inferUnitCombatType({defId}) !== expectedCombatType);
   if(invalidMember){
     alert(expectedCombatType === 2
       ? 'Fleet missions can only use ship names.'
       : 'Combat and special missions can only use character names.');
+    return;
+  }
+  if(isFleetMission && memberDefIds.find(defId=>defId && _isCapitalShipRef(defId))){
+    alert('Capital ships can only be used in the fleet leader slot.');
+    return;
+  }
+
+  const duplicateName = (() => {
+    const seen = new Map();
+    const allEntries = [{slot:'Leader', name:leader, defId:leaderDefId}]
+      .concat(rawMembers.filter(Boolean).map((name, idx)=>({
+        slot:isFleetMission
+          ? (idx < GUIDE_FLEET_STARTER_INPUT_IDS.length ? ('Starting Ship '+(idx+1)) : ('Reinforcement '+(idx + 1 - GUIDE_FLEET_STARTER_INPUT_IDS.length)))
+          : ('Member '+(idx+1)),
+        name,
+        defId: resolveUnitNameToDefId(name)
+      })));
+    for(const entry of allEntries){
+      const key = _guideUnitSelectionKey(entry.name, entry.defId);
+      if(!key) continue;
+      if(seen.has(key)) return entry.name || seen.get(key).name;
+      seen.set(key, entry);
+    }
+    return '';
+  })();
+  if(duplicateName){
+    alert('Each squad slot must use a unique unit. Duplicate found: '+duplicateName);
     return;
   }
   const notes    = document.getElementById('se-notes').value.trim();
@@ -2008,9 +2278,7 @@ function initGuideTab(){
 
 
 
-// ═══════════════════════════════════════════════════════════════════
 // ROSTER VIEWER
-// ═══════════════════════════════════════════════════════════════════
 
 let _rosterData  = [];    // current member's full roster (simplified units)
 let _rosterSort  = {key:'name', dir:1};
@@ -2214,7 +2482,7 @@ const UNIT_NAMES = {
   NUTEGUNRAY:'Nute Gunray',
   OLDBENKENOBI:'Obi-Wan Kenobi (Old Ben)',
   PADAWANOBIWAN:'Padawan Obi-Wan',
-  PADMEAMIDALA:'Padmé Amidala',
+  PADMEAMIDALA:'PadmÃ© Amidala',
   PAO:'Pao',
   PAPLOO:'Paploo',
   PAZVIZSLA:'Paz Vizsla',
@@ -2972,7 +3240,7 @@ const ALL_CHAR_NAMES = [
   'Old Daka',
   'Omega',
   'Padawan Obi-Wan',
-  'Padmé Amidala',
+  'PadmÃ© Amidala',
   'Pao',
   'Paploo',
   'Paz Vizsla',
@@ -3267,12 +3535,29 @@ function normalizeGuideSquad(squad){
   ).toUpperCase();
   if(!leader && leaderDefId) leader = defIdToName(leaderDefId, '');
 
-  const rawMembers = Array.isArray(source.members) ? source.members : [];
-  const rawMemberDefIds = Array.isArray(source.memberDefIds) ? source.memberDefIds : [];
+  const rawMembers = Array.isArray(source.members) ? source.members.slice(0, GUIDE_FLEET_MEMBER_INPUT_IDS.length) : [];
+  const rawMemberDefIds = Array.isArray(source.memberDefIds) ? source.memberDefIds.slice(0, GUIDE_FLEET_MEMBER_INPUT_IDS.length) : [];
   const members = [];
   const memberDefIds = [];
+  let lastFilledMemberIdx = -1;
 
-  rawMembers.forEach((member, idx)=>{
+  for(let idx = 0; idx < Math.max(rawMembers.length, rawMemberDefIds.length); idx++){
+    const member = rawMembers[idx];
+    const rawDefId = rawMemberDefIds[idx];
+    const memberName = typeof member === 'string'
+      ? member.trim()
+      : String(member?.name || member?.label || '').trim();
+    const memberDefId = normalizeDefId(
+      rawDefId ||
+      member?.defId ||
+      member?.id ||
+      resolveUnitNameToDefId(memberName)
+    ).toUpperCase();
+    if(memberName || memberDefId) lastFilledMemberIdx = idx;
+  }
+
+  for(let idx = 0; idx <= lastFilledMemberIdx; idx++){
+    const member = rawMembers[idx];
     const memberName = typeof member === 'string'
       ? member.trim()
       : String(member?.name || member?.label || '').trim();
@@ -3283,10 +3568,9 @@ function normalizeGuideSquad(squad){
       resolveUnitNameToDefId(memberName)
     ).toUpperCase();
     const displayName = memberName || (memberDefId ? defIdToName(memberDefId, '') : '');
-    if(!displayName) return;
-    members.push(displayName);
+    members.push(displayName || '');
     memberDefIds.push(memberDefId);
-  });
+  }
 
   return {
     ...source,
@@ -3799,12 +4083,13 @@ function allocateOperationsForDay(day, dayPlan, opsState, detailed=false){
 
 function summarizeOperationsState(opsState, daySummaries=[]){
   const planetStats = {};
+  const activeBonusIds = getActiveBonusPlanetIdsFromPlanDays(daySummaries);
   let totalCompleted = 0;
   let totalPlatoons = 0;
   let totalPoints = 0;
   Object.entries(_opsDefinitions||{}).forEach(([pid, planetDef])=>{
     const meta = getPlanetMetaById(pid);
-    if(meta?.unlockedBy && !bonusUnlocked(pid)) return;
+    if(meta?.unlockedBy && !activeBonusIds.has(pid)) return;
     const planetState = opsState?.planets?.[pid];
     const completedPlatoons = planetState?.completedPlatoons || 0;
     const totalPlanetPlatoons = planetDef.platoons.length;
@@ -3956,10 +4241,10 @@ function renderAbilitySummary(rawDefId, unit){
     const levelLabel = abilityLevelLabel(skill);
     const badges = [];
     const normalizedAbility = normalizeUnitName(displayName);
-    if(zNames.has(normalizedAbility)){
+    if(skill?.hasZeta || zNames.has(normalizedAbility)){
       badges.push('<span style="font-size:.56rem;color:#b58cff;border:1px solid rgba(181,140,255,.45);border-radius:999px;padding:0 5px">Z</span>');
     }
-    if(oNames.has(normalizedAbility)){
+    if(skill?.hasOmicron || oNames.has(normalizedAbility)){
       badges.push('<span style="font-size:.56rem;color:#ff8d8d;border:1px solid rgba(255,141,141,.45);border-radius:999px;padding:0 5px">O</span>');
     }
     return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-size:.64rem;line-height:1.25;margin-bottom:2px">'+
@@ -3984,10 +4269,10 @@ function renderRosterList(){
     const r7=chars.filter(u=>(Number(u.relic)||0)>=7).length;
     const r5=chars.filter(u=>(Number(u.relic)||0)>=5).length;
     const scanHint=chars.length && !chars.some(u=>Array.isArray(u.skills) && u.skills.length>0)
-      ? ' · re-scan rosters to load ability details'
+      ? ' | re-scan rosters to load ability details'
       : '';
-    summary.textContent=total+' units · '+chars.length+' characters · '+ships.length+' ships · '+
-      r7+' R7+ · '+r5+' R5+'+scanHint;
+    summary.textContent=total+' units | '+chars.length+' characters | '+ships.length+' ships | '+
+      r7+' R7+ | '+r5+' R5+'+scanHint;
   }
 
   if(total===0){
@@ -4114,9 +4399,7 @@ async function checkComlinkStatus(){
   return d;
 }
 
-// ═══════════════════════════════════════════════════════════════════
 // LIVE IMPORT
-// ═══════════════════════════════════════════════════════════════════
 function showImportStatus(msg,type){
   const el=document.getElementById('import-status-bar');
   el.style.display='block';
@@ -4454,7 +4737,7 @@ async function scanRosters(){
     const rate = elapsed>0 ? done/elapsed : 1;
     const remSec = Math.ceil((total-done)/rate);
     if(pbf) pbf.style.width=pct+'%';
-    if(pbt) pbt.textContent=done+'/'+total+' scanned'+(failed?' · '+failed+' failed':'')+' · ~'+remSec+'s left';
+    if(pbt) pbt.textContent=done+'/'+total+' scanned'+(failed?' | '+failed+' failed':'')+' | ~'+remSec+'s left';
 
     if(i < members.length-1) await sleep(REQ_DELAY);
   }
@@ -4463,7 +4746,7 @@ async function scanRosters(){
     showImportStatus('Scan cancelled — '+done+' of '+total+' members scanned.','err');
   }
   pb.style.display='none';
-  btn.disabled=false; btn.textContent='🔍 Scan Rosters';
+  btn.disabled=false; btn.textContent='Scan Rosters';
   if(!_scanCancelled){
     invalidateOperationsCaches();
     rebuildUnitNameIndex();
@@ -4502,9 +4785,7 @@ function renderRosterAnalysis(counts,total){
   document.getElementById('roster-analysis').style.display='block';
 }
 
-// ═══════════════════════════════════════════════════════════════════
 // UTILS
-// ═══════════════════════════════════════════════════════════════════
 const fmt=n=>Math.round(n).toLocaleString();
 const fmtM=n=>n>=1e9?(n/1e9).toFixed(2)+'B':(n/1e6).toFixed(1)+'M';
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
@@ -4559,14 +4840,12 @@ function calcPlanetPts(pid,day=1){
     ? projected.points
     : (opsFilled * p.opsVal);
 
-  // Manual deployment GP override (planet card input)
-  const gpPts  = s.gpDeploy || 0;
   const preload = s.preloaded || 0;
 
   // Available deployment GP for this day
   const gpAvail = gpForDay(day);
 
-  return {total:cmPts+flPts+opsPts+gpPts+preload, cmPts, flPts, opsPts, gpPts, preload,
+  return {total:cmPts+flPts+opsPts+preload, cmPts, flPts, opsPts, preload,
           opsFilled, gpAvail, cmCompletions, flCompletions};
 }
 function calcStars(pid,day=1){
@@ -4575,12 +4854,69 @@ function calcStars(pid,day=1){
 }
 function bonusUnlocked(bonusId){
   const b=BONUS_PLANETS.find(x=>x.id===bonusId);
-  return(pState[b.unlockedBy].smCount||0)>=b.unlockedAt;
+  if(!b || !b.unlockedBy || !pState[b.unlockedBy]) return false;
+  const source = pState[b.unlockedBy];
+  if(typeof source.smReady === 'boolean') return source.smReady;
+  return (source.smCount||0)>=b.unlockedAt;
 }
 
-// ═══════════════════════════════════════════════════════════════════
+function createBonusActivationState(){
+  const state = {};
+  BONUS_PLANETS.forEach(planet=>{
+    state[planet.id] = {
+      eligible: bonusUnlocked(planet.id),
+      activeFromDay: 0,
+      unlockedOnDay: 0,
+      banked: 0,
+      done: false
+    };
+  });
+  return state;
+}
+
+function getActiveBonusPlanetsForDay(bonusState, dayNumber){
+  return BONUS_PLANETS
+    .filter(planet=>{
+      const state = bonusState?.[planet.id];
+      return !!state?.eligible
+        && !state.done
+        && Number(state.activeFromDay || 0) > 0
+        && Number(dayNumber || 0) >= Number(state.activeFromDay || 0);
+    })
+    .map(planet=>({planet, state: bonusState[planet.id]}));
+}
+
+function scheduleUnlockedBonusPlanets(bonusState, sourcePlanetId, dayNumber, notices=null){
+  BONUS_PLANETS.forEach(planet=>{
+    const state = bonusState?.[planet.id];
+    if(!state?.eligible || state.done) return;
+    if(planet.unlockedBy !== sourcePlanetId) return;
+    if(Number(state.activeFromDay || 0) > 0) return;
+    const activeFromDay = Number(dayNumber || 0) + 1;
+    if(activeFromDay > 6) return;
+    state.activeFromDay = activeFromDay;
+    state.unlockedOnDay = Number(dayNumber || 0);
+    if(Array.isArray(notices)){
+      notices.push(
+        planet.name+' unlocks on Day '+activeFromDay
+        +' after '+(getPlanetMetaById(sourcePlanetId)?.name || sourcePlanetId)+' reaches 1-star.'
+      );
+    }
+  });
+}
+
+function getActiveBonusPlanetIdsFromPlanDays(days){
+  const ids = new Set();
+  (days || []).forEach(dayPlan=>{
+    (dayPlan?.bonusPlanets || []).forEach(entry=>{
+      const pid = entry?.planet?.id;
+      if(pid) ids.add(pid);
+    });
+  });
+  return ids;
+}
+
 // SETTINGS
-// ═══════════════════════════════════════════════════════════════════
 function onStatsChange(){
   invalidateOperationsCaches();
   buildUndepTable();
@@ -4770,9 +5106,12 @@ function applyPersistedAppState(state){
       Object.keys(pState).forEach(pid=>{
         if(!state.pState[pid]) return;
         const next = state.pState[pid];
+        const meta = ALL_PLANETS.find(planet=>planet.id===pid);
+        const legacyUnlockReady = !!(meta?.smUnlocks && meta?.smThreshold && (Number(next.smCount)||0) >= Number(meta.smThreshold));
         pState[pid] = {
           ...pState[pid],
           ...next,
+          smReady: typeof next.smReady === 'boolean' ? next.smReady : legacyUnlockReady,
           ops: Array.isArray(next.ops) ? next.ops.slice(0,6).map(Boolean) : pState[pid].ops
         };
       });
@@ -4872,9 +5211,7 @@ function calcSummary(){
   document.getElementById('s-ops').textContent=ot+'/'+om;
 }
 
-// ═══════════════════════════════════════════════════════════════════
 // PLANET PLANNER
-// ═══════════════════════════════════════════════════════════════════
 function capabilityBadge(pid){
   try{
     const cap=calcMemberCapability(pid);
@@ -4898,7 +5235,7 @@ function buildPlanetCard(p,depth){
   if(isBonus&&!unlocked)cardClass+=' locked-planet';
   const cmDisp=cmMode==='pct'?(s.cmRateOverride!==null?s.cmRateOverride:Math.round(clamp(cmBase()-cmFall()*depth,0,100))):(s.cmCountOverride!==null?s.cmCountOverride:Math.round(m*clamp((cmBase()-cmFall()*depth)/100,0,1)));
   const flDisp=cmMode==='pct'?(s.fleetRateOverride!==null?s.fleetRateOverride:Math.round(clamp(flBase()-flFall()*depth,0,100))):(s.fleetCountOverride!==null?s.fleetCountOverride:Math.round(m*clamp((flBase()-flFall()*depth)/100,0,1)));
-  const smHtml=p.sms?`<div class="sm-box"><div class="sm-box-label">${p.smLabel||'Special Mission'}</div><div class="sm-progress-row"><input class="mini-in" type="number" min="0" max="${m}" value="${s.smCount||0}" style="width:55px" oninput="setSmCount('${p.id}',this.value)"><div class="sm-pbar"><div class="sm-pfill" style="width:${p.smThreshold?Math.min(100,(s.smCount||0)/p.smThreshold*100):0}%"></div></div>${p.smThreshold?`<span style="font-size:.68rem;color:var(--text3);white-space:nowrap">/${p.smThreshold}</span>`:''}</div><div class="sm-note">${p.smThreshold?((s.smCount||0)>=p.smThreshold?`<span style="color:var(--bonus)">✓ ${p.smUnlocks} UNLOCKED</span>`:`${Math.max(0,p.smThreshold-(s.smCount||0))} more to unlock ${p.smUnlocks}`):'&nbsp;'}</div></div>`:'';
+  const smHtml=p.sms?(p.smUnlocks?`<div class="sm-box"><div class="sm-box-label">${p.smLabel||'Special Mission Unlock'}</div><label class="ops-slot-row" style="align-items:center;gap:10px;cursor:pointer"><input type="checkbox" ${s.smReady?'checked':''} onchange="setSmReady('${p.id}',this.checked)"><span style="font-size:.78rem;color:var(--text)">Plan to unlock ${(p.smUnlocks||'').charAt(0).toUpperCase() + (p.smUnlocks||'').slice(1)} on ${p.name}</span></label><div class="sm-note">${s.smReady?`<span style="color:var(--bonus)">✓ ${(p.smUnlocks||'').charAt(0).toUpperCase() + (p.smUnlocks||'').slice(1)} is enabled for the planner</span>`:'Leave unchecked unless the guild can clear this unlock special mission.'}</div></div>`:`<div class="sm-box"><div class="sm-box-label">${p.smLabel||'Special Mission'}</div><div class="sm-note">Use Guides to track the squad plan for this special mission.</div></div>`):'';
   const flHtml=p.fleets?`<div class="cm-row"><span class="cm-row-label">Fleet</span><div><div class="mini-label">${cmMode==='pct'?'Comp %':'Comp #'}</div><input class="mini-in" type="number" min="0" max="${cmMode==='pct'?100:m}" value="${flDisp}" oninput="setFleetOv('${p.id}',this.value)"></div><div><div class="mini-label">est pts</div><div class="mini-val">${fmtM(flPts)}</div></div></div>`:'';
   return`<div class="${cardClass}" id="card-${p.id}">
 <div class="pcard-header"><div>
@@ -4915,8 +5252,6 @@ ${flHtml}</div>
 ${smHtml}
 <div class="msec-head">Operations <span></span></div>
 ${getPlatoonHtml(p.id)}
-<div class="msec-head" style="margin-top:8px">Extra GP Deployed <span></span></div>
-<div class="gp-deploy-row"><input class="mini-in" type="number" min="0" value="${s.gpDeploy||0}" style="text-align:left;padding:4px 8px" oninput="setGpDeploy('${p.id}',this.value)"><span class="gp-deploy-note">${fmtM(s.gpDeploy||0)}</span></div>
 <div class="pnote ${stars===3?'maxed':'need'}">${stars===3?'✓ 3 stars achievable':fmt(Math.round(Math.max(0,needPts)))+' pts needed for '+(stars+1)+'★'}</div>
 </div>`;
 }
@@ -4964,12 +5299,8 @@ function updateCard(pid){
 }
 function setCmOv(pid,v){if(cmMode==='pct')pState[pid].cmRateOverride=parseFloat(v);else pState[pid].cmCountOverride=parseInt(v);invalidateOperationsCaches();updateCard(pid);}
 function setFleetOv(pid,v){if(cmMode==='pct')pState[pid].fleetRateOverride=parseFloat(v);else pState[pid].fleetCountOverride=parseInt(v);invalidateOperationsCaches();updateCard(pid);}
-function setSmCount(pid,v){pState[pid].smCount=parseInt(v)||0;invalidateOperationsCaches();updateCard(pid);rebuildPlannerChains();}
-function setGpDeploy(pid,v){pState[pid].gpDeploy=parseFloat(v)||0;invalidateOperationsCaches();updateCard(pid);}
-// ═══════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════
+function setSmReady(pid,checked){pState[pid].smReady=!!checked;invalidateOperationsCaches();updateCard(pid);rebuildPlannerChains();}
 // DAY PLAN OPTIMIZER
-// ═══════════════════════════════════════════════════════════════════
 
 // Mission + ops points only — GP is allocated separately by the optimizer
 // ── Correct mission point model ───────────────────────────────────────
@@ -5110,8 +5441,7 @@ function runOptimizer() {
     mx: { idx: 0, banked: 0 },
     ls: { idx: 0, banked: 0 }
   };
-  const bonusT = { mandalore: false, zeffo: false };
-  const bonusU = { mandalore: false, zeffo: false };
+  const bonusState = createBonusActivationState();
   const results = [];
   let totalStars = 0;
 
@@ -5119,9 +5449,7 @@ function runOptimizer() {
     const gpDay = gpForDay(day);
     const isLast = day === 6;
     const notices = [];
-
-    if (!bonusT.mandalore && bonusUnlocked('mandalore')) { bonusT.mandalore = true; notices.push('Mandalore bonus planet unlocked!'); }
-    if (!bonusT.zeffo && bonusUnlocked('zeffo')) { bonusT.zeffo = true; notices.push('Zeffo bonus planet unlocked!'); }
+    const activeBonusPlanets = getActiveBonusPlanetsForDay(bonusState, day);
 
     // Active planet + base points for each chain
     const act = {};
@@ -5216,7 +5544,11 @@ function runOptimizer() {
             note: 'Was preloaded yesterday — committing today regardless'
           };
           dayRes.starsDay += stars2;
-          if(stars2>=1){ st[c].idx++; st[c].banked=0; }
+          if(stars2>=1){
+            st[c].idx++;
+            st[c].banked=0;
+            scheduleUnlockedBonusPlanets(bonusState, a.p.id, day, notices);
+          }
           else { st[c].banked = safeBanked; }
         } else {
           st[c].banked = safeBanked;
@@ -5249,6 +5581,7 @@ function runOptimizer() {
         if (stars >= 1) {
           st[c].idx++;
           st[c].banked = 0;
+          scheduleUnlockedBonusPlanets(bonusState, a.p.id, day, notices);
         } else {
           st[c].banked = a.base;
         }
@@ -5256,17 +5589,30 @@ function runOptimizer() {
     });
 
     // Bonus planets: use spare GP
-    BONUS_PLANETS.forEach(b => {
-      if (!bonusT[b.id] || bonusU[b.id]) return;
+    activeBonusPlanets.forEach(({planet:b, state}) => {
       const mpts = missionOnlyPts(b.id);
-      const base = mpts;
+      const base = state.banked + mpts;
       const gpNeed = Math.max(0, b.stars[2] - base);
       const gpUsed = Math.min(spareGP, gpNeed);
       spareGP -= gpUsed;
       const pts = base + gpUsed;
       const bs = starsAt(b, pts);
-      if (bs >= 1) bonusU[b.id] = true;
-      dayRes.bonusPlanets.push({ planet: b, pts, stars: bs });
+      const carryOver = bs >= 1 ? 0 : Math.min(pts, b.stars[0] - 1);
+      if (bs >= 1) {
+        state.done = true;
+        state.banked = 0;
+      } else {
+        state.banked = carryOver;
+      }
+      dayRes.bonusPlanets.push({
+        planet: b,
+        pts,
+        stars: bs,
+        gpDeployed: gpUsed,
+        carryOver,
+        activeFromDay: state.activeFromDay,
+        unlockedOnDay: state.unlockedOnDay
+      });
       dayRes.starsDay += bs;
     });
 
@@ -5342,10 +5688,8 @@ Action values: "commit1", "commit2", "commit3" (commit targeting 1/2/3 stars), "
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
 // MULTI-ALGORITHM OPTIMIZATION ENGINE
 // All algorithms are implemented in-browser with no external dependencies.
-// ═══════════════════════════════════════════════════════════════════
 
 // Genome encoding: flat array of 18 integers
 // [d0_ds, d0_mx, d0_ls, d1_ds, d1_mx, d1_ls, ... d5_ds, d5_mx, d5_ls]
@@ -5363,8 +5707,7 @@ const _yield = () => new Promise(r => setTimeout(r, 0));
 // ── Fitness evaluation ──────────────────────────────────────────────────────
 function simulateGenomePlan(genome, detailed=false) {
   const st = {ds:{idx:0,banked:0}, mx:{idx:0,banked:0}, ls:{idx:0,banked:0}};
-  const bonusState = {};
-  BONUS_PLANETS.forEach(b=>{ bonusState[b.id] = {done:false, banked:0}; });
+  const bonusState = createBonusActivationState();
   const opsState = createOperationsSimState(detailed);
   const days = [];
   let totalStars = 0;
@@ -5372,6 +5715,8 @@ function simulateGenomePlan(genome, detailed=false) {
   for (let day=0; day<6; day++) {
     const dayNumber = day + 1;
     const gpDay = gpForDay(dayNumber);
+    const notices = [];
+    const activeBonusPlanets = getActiveBonusPlanetsForDay(bonusState, dayNumber);
     const previewPlan = {day:dayNumber, chains:{}, bonusPlanets:[]};
     OPT_CKEYS.forEach((c,ci)=>{
       const gene = genome[day*3+ci];
@@ -5386,9 +5731,12 @@ function simulateGenomePlan(genome, detailed=false) {
         stars: gene
       };
     });
-    BONUS_PLANETS.forEach(b=>{
-      if(!bonusUnlocked(b.id) || bonusState[b.id]?.done) return;
-      previewPlan.bonusPlanets.push({planet:b});
+    activeBonusPlanets.forEach(entry=>{
+      previewPlan.bonusPlanets.push({
+        planet: entry.planet,
+        activeFromDay: entry.state.activeFromDay,
+        unlockedOnDay: entry.state.unlockedOnDay
+      });
     });
 
     const dayOps = allocateOperationsForDay(dayNumber, previewPlan, opsState, detailed);
@@ -5453,31 +5801,42 @@ function simulateGenomePlan(genome, detailed=false) {
           preloadAmt:st[c].banked,
           opsPts
         };
-        if(stars>=1){ st[c].idx++; st[c].banked = 0; }
+        if(stars>=1){
+          st[c].idx++;
+          st[c].banked = 0;
+          scheduleUnlockedBonusPlanets(bonusState, p.id, dayNumber, notices);
+        }
         else { st[c].banked = base; }
       }
     });
 
     let spareGP = Math.max(0, gpDay - gpUsed);
     const bonusPlanets = [];
-    BONUS_PLANETS.forEach(b=>{
-      if(!bonusUnlocked(b.id) || bonusState[b.id]?.done) return;
-      const base = bonusState[b.id].banked + missionOnlyPts(b.id) + (opsPointsByPlanet[b.id] || 0);
+    activeBonusPlanets.forEach(({planet:b, state})=>{
+      const base = state.banked + missionOnlyPts(b.id) + (opsPointsByPlanet[b.id] || 0);
       const gpNeedB = Math.max(0, b.stars[2] - base);
       const gpUsedB = Math.min(spareGP, gpNeedB);
       spareGP -= gpUsedB;
       gpUsed += gpUsedB;
       const pts = base + gpUsedB;
       const stars = starsAt(b, pts);
-      if(pts > 0 || (opsPointsByPlanet[b.id] || 0) > 0){
-        bonusPlanets.push({planet:b, pts, stars, opsPts:(opsPointsByPlanet[b.id] || 0)});
-      }
+      const carryOver = stars >= 1 ? 0 : Math.min(pts, b.stars[0]-1);
+      bonusPlanets.push({
+        planet:b,
+        pts,
+        stars,
+        opsPts:(opsPointsByPlanet[b.id] || 0),
+        gpDeployed:gpUsedB,
+        carryOver,
+        activeFromDay:state.activeFromDay,
+        unlockedOnDay:state.unlockedOnDay
+      });
       starsDay += stars;
       if(stars>=1){
-        bonusState[b.id].done = true;
-        bonusState[b.id].banked = 0;
+        state.done = true;
+        state.banked = 0;
       } else {
-        bonusState[b.id].banked = Math.min(base, b.stars[0]-1);
+        state.banked = carryOver;
       }
     });
 
@@ -5488,7 +5847,7 @@ function simulateGenomePlan(genome, detailed=false) {
       gpUsed,
       starsDay,
       chains,
-      notices: [],
+      notices,
       bonusPlanets,
       opsPoints: dayOps.pointsEarned || 0,
       opsCompleted: dayOps.completedPlatoons || [],
@@ -5703,6 +6062,83 @@ function simulateGenomeDetailed(genome) {
 }
 
 // ── Main: run selected algorithm(s) and display result ─────────────────────
+function buildMainDayChainCardHtml(chainKey, chainEntry, chainNames){
+  if (!chainEntry || chainEntry.status === 'complete') {
+    return '<div class="day-chain '+chainKey+'"><div class="day-chain-title">'+chainNames[chainKey]+'</div><div class="day-locked">Complete</div></div>';
+  }
+  const planet = chainEntry.planet;
+  let inner = '';
+  if (chainEntry.status === 'preload') {
+    const tomorrowEst = fmtM(chainEntry.tomorrowEst || chainEntry.banked);
+    const capNote = chainEntry.threshold1star
+      ? '<div class="day-advance" style="color:var(--text3)">Capped at '
+        + fmtM(chainEntry.threshold1star - 1) + ' (1-star threshold: ' + fmtM(chainEntry.threshold1star) + ')</div>'
+      : '';
+    inner = '<div class="day-stars" style="color:#c39bd3">Preloading</div>'
+      + '<div class="day-action">Banking ' + fmtM(chainEntry.banked) + ' pts</div>'
+      + '<div class="day-advance">Tomorrow est. base: ' + tomorrowEst + '</div>'
+      + capNote;
+  } else if (chainEntry.status === 'commit') {
+    const preloadNote = chainEntry.preloadAmt > 0
+      ? '<div class="day-advance">Incl. ' + fmtM(chainEntry.preloadAmt) + ' banked from preload</div>'
+      : '';
+    const gpNote = chainEntry.gpDeployed > 0 ? ' + ' + fmtM(chainEntry.gpDeployed) + ' GP' : '';
+    const opsNote = chainEntry.opsPts > 0
+      ? '<div class="day-advance" style="color:var(--mx)">Ops contributed ' + fmtM(chainEntry.opsPts) + '</div>'
+      : '';
+    const advNote = chainEntry.stars === 3
+      ? '<div class="day-advance" style="color:var(--mx)">3-star! Next planet unlocks tomorrow</div>'
+      : '<div class="day-advance">' + chainEntry.pctOf3 + '% of 3-star | next planet unlocks tomorrow</div>';
+    inner = '<div class="day-stars">' + chainEntry.stars + ' stars</div>'
+      + '<div class="day-action">' + fmtM(chainEntry.pts) + ' pts' + gpNote + '</div>'
+      + advNote + preloadNote + opsNote;
+  } else {
+    inner = '<div class="day-stars" style="color:var(--ds)">Below 1-star</div>'
+      + '<div class="day-action">' + fmtM(chainEntry.pts) + ' / ' + fmtM(planet.stars[0]) + ' for 1-star</div>'
+      + '<div class="day-advance">Banking ' + fmtM(chainEntry.pts) + ' - needs more GP or preloading</div>';
+  }
+  return '<div class="day-chain '+chainKey+'"><div class="day-chain-title">'+chainNames[chainKey]+'</div>'
+    + '<div class="day-planet-name">'+escHtml(planet.name)+'</div>' + inner + '</div>';
+}
+
+function buildBonusDayChainCardHtml(bonusEntry){
+  const planet = bonusEntry?.planet;
+  if(!planet) return '';
+  const gpNote = bonusEntry.gpDeployed > 0 ? ' + ' + fmtM(bonusEntry.gpDeployed) + ' GP' : '';
+  const opsNote = bonusEntry.opsPts > 0
+    ? '<div class="day-advance" style="color:var(--mx)">Ops contributed ' + fmtM(bonusEntry.opsPts) + '</div>'
+    : '';
+  const sourceName = getPlanetMetaById(planet.unlockedBy)?.name || planet.unlockedBy || 'its unlock planet';
+  const unlockNote = bonusEntry.unlockedOnDay
+    ? '<div class="day-advance">Unlocked after ' + escHtml(sourceName) + ' hit 1-star on Day ' + bonusEntry.unlockedOnDay + '</div>'
+    : '';
+  let inner = '';
+  if ((Number(bonusEntry.stars) || 0) >= 1) {
+    inner = '<div class="day-stars">' + bonusEntry.stars + ' stars</div>'
+      + '<div class="day-action">' + fmtM(bonusEntry.pts) + ' pts' + gpNote + '</div>'
+      + '<div class="day-advance" style="color:#c39bd3">Locks tomorrow after earning stars</div>'
+      + unlockNote + opsNote;
+  } else {
+    inner = '<div class="day-stars" style="color:#c39bd3">Active</div>'
+      + '<div class="day-action">' + fmtM(bonusEntry.pts) + ' / ' + fmtM(planet.stars[0]) + ' for 1-star' + gpNote + '</div>'
+      + '<div class="day-advance">Carryover into tomorrow: ' + fmtM(bonusEntry.carryOver || 0) + '</div>'
+      + unlockNote + opsNote;
+  }
+  return '<div class="day-chain bonus"><div class="day-chain-title">Bonus Planet</div>'
+    + '<div class="day-planet-name">'+escHtml(planet.name)+'</div>' + inner + '</div>';
+}
+
+function buildDayPlanCardsHtml(dayPlan, chainNames){
+  const cards = OPT_CKEYS.map(chainKey=>
+    buildMainDayChainCardHtml(chainKey, dayPlan?.chains?.[chainKey], chainNames)
+  );
+  (dayPlan?.bonusPlanets || []).forEach(bonusEntry=>{
+    const cardHtml = buildBonusDayChainCardHtml(bonusEntry);
+    if(cardHtml) cards.push(cardHtml);
+  });
+  return cards.join('');
+}
+
 let _optRunning = false;
 
 // ── Render optimized plan (same display format as existing generateDayPlan) ─
@@ -5731,35 +6167,7 @@ function renderOptPlan(planResult, algoName, allResults) {
   }
 
   days.forEach(d => {
-    const cards = OPT_CKEYS.map(c => {
-      const cd = d.chains[c];
-      if (!cd||cd.status==='complete')
-        return '<div class="day-chain '+c+'"><div class="day-chain-title">'+CHAIN_NAMES[c]+'</div><div class="day-locked">Complete</div></div>';
-      const p=cd.planet;
-      let inner='';
-      if (cd.status==='preload') {
-        inner='<div class="day-stars" style="color:#c39bd3">Preloading</div>'+
-          '<div class="day-action">Banking '+fmtM(cd.banked)+' pts</div>'+
-          '<div class="day-advance">Tomorrow est. base: '+fmtM(cd.tomorrowEst)+'</div>'+
-          '<div class="day-advance" style="color:var(--text3)">1★ threshold: '+fmtM(cd.threshold1star)+'</div>';
-      } else if (cd.status==='commit') {
-        const preNote=cd.preloadAmt>0?'<div class="day-advance">Incl. '+fmtM(cd.preloadAmt)+' banked</div>':'';
-        const gpNote=cd.gpDeployed>0?' + '+fmtM(cd.gpDeployed)+' GP':'';
-        const opsNote=cd.opsPts>0?'<div class="day-advance" style="color:var(--mx)">Ops contributed '+fmtM(cd.opsPts)+'</div>':'';
-        const advNote=cd.stars===3
-          ?'<div class="day-advance" style="color:var(--mx)">3-star! Next planet unlocks</div>'
-          :'<div class="day-advance">'+cd.pctOf3+'% of 3★ · next planet unlocks</div>';
-        inner='<div class="day-stars">'+cd.stars+' stars</div>'+
-          '<div class="day-action">'+fmtM(cd.pts)+' pts'+gpNote+'</div>'+
-          advNote+preNote+opsNote;
-      } else {
-        inner='<div class="day-stars" style="color:var(--ds)">Below 1★</div>'+
-          '<div class="day-action">'+fmtM(cd.pts)+' / '+fmtM(p.stars[0])+' for 1★</div>'+
-          '<div class="day-advance">Banking '+fmtM(cd.pts)+'</div>';
-      }
-      return '<div class="day-chain '+c+'"><div class="day-chain-title">'+CHAIN_NAMES[c]+'</div>'+
-        '<div class="day-planet-name">'+p.name+'</div>'+inner+'</div>';
-    }).join('');
+    const cards = buildDayPlanCardsHtml(d, CHAIN_NAMES);
 
     let notesHtml=d.notices.map(n=>'<div class="day-note bonus">'+n+'</div>').join('');
     if(d.opsPoints || Object.values(d.opsPlanets || {}).some(planet=>planet.slotsFilled > 0)){
@@ -5775,9 +6183,6 @@ function renderOptPlan(planResult, algoName, allResults) {
       notesHtml += '<div class="day-note" style="color:var(--mx)">Operations: '+(d.opsPoints?('+'+fmtM(d.opsPoints)):'preloading only')+'</div>';
       opsLines.forEach(line=>{ notesHtml += '<div class="day-note">'+escHtml(line)+'</div>'; });
     }
-    (d.bonusPlanets||[]).forEach(bp=>{
-      notesHtml+='<div class="day-note bonus">Bonus — '+bp.planet.name+': '+fmtM(bp.pts)+' pts = '+bp.stars+'★</div>';
-    });
 
     html+='<div class="day-block">'+
       '<div class="day-block-header">'+
@@ -5791,7 +6196,7 @@ function renderOptPlan(planResult, algoName, allResults) {
       '</div>';
   });
 
-  const bc=BONUS_PLANETS.filter(b=>bonusUnlocked(b.id)).length;
+  const bc=getActiveBonusPlanetIdsFromPlanDays(days).size;
   const ot = planResult?.opsSummary?.totalCompleted || 0;
   const om = planResult?.opsSummary?.totalPlatoons || 0;
   _lastPlanResult = planResult;
@@ -5815,47 +6220,9 @@ function generateDayPlan() {
     const CHAIN_NAMES = { ds: 'Dark Side', mx: 'Mixed', ls: 'Light Side' };
 
     days.forEach(d => {
-      const cards = ['ds', 'mx', 'ls'].map(c => {
-        const cd = d.chains[c];
-        if (!cd || cd.status === 'complete') {
-          return '<div class="day-chain ' + c + '"><div class="day-chain-title">' + CHAIN_NAMES[c] + '</div><div class="day-locked">Complete</div></div>';
-        }
-        const p = cd.planet;
-        let inner = '';
-
-        if (cd.status === 'preload') {
-          const tomEst = fmtM(cd.tomorrowEst || cd.banked);
-          const capNote = cd.threshold1star
-            ? '<div class="day-advance" style="color:var(--text3)">Capped at '
-              + fmtM(cd.threshold1star-1)+' (1★ threshold: '+fmtM(cd.threshold1star)+')</div>'
-            : '';
-          inner = '<div class="day-stars" style="color:#c39bd3">Preloading</div>'
-                + '<div class="day-action">Banking ' + fmtM(cd.banked) + ' pts</div>'
-                + '<div class="day-advance">Tomorrow est. base: ' + tomEst + '</div>'
-                + capNote;
-        } else if (cd.status === 'commit') {
-          const preloadNote = cd.preloadAmt > 0 ? '<div class="day-advance">Incl. ' + fmtM(cd.preloadAmt) + ' banked from preload</div>' : '';
-          const gpNote = cd.gpDeployed > 0 ? ' + ' + fmtM(cd.gpDeployed) + ' GP' : '';
-          const advNote = cd.stars === 3
-            ? '<div class="day-advance" style="color:var(--mx)">3-star! Next planet unlocks tomorrow</div>'
-            : '<div class="day-advance">' + cd.pctOf3 + '% of 3-star · next planet unlocks tomorrow</div>';
-          inner = '<div class="day-stars">' + cd.stars + ' stars</div>'
-                + '<div class="day-action">' + fmtM(cd.pts) + ' pts' + gpNote + '</div>'
-                + advNote + preloadNote;
-        } else {
-          inner = '<div class="day-stars" style="color:var(--ds)">Below 1-star</div>'
-                + '<div class="day-action">' + fmtM(cd.pts) + ' / ' + fmtM(p.stars[0]) + ' for 1-star</div>'
-                + '<div class="day-advance">Banking ' + fmtM(cd.pts) + ' — needs more GP or preloading</div>';
-        }
-
-        return '<div class="day-chain ' + c + '"><div class="day-chain-title">' + CHAIN_NAMES[c] + '</div>'
-             + '<div class="day-planet-name">' + p.name + '</div>' + inner + '</div>';
-      }).join('');
+      const cards = buildDayPlanCardsHtml(d, CHAIN_NAMES);
 
       let notesHtml = d.notices.map(n => '<div class="day-note bonus">' + n + '</div>').join('');
-      d.bonusPlanets.forEach(bp => {
-        notesHtml += '<div class="day-note bonus">Bonus — ' + bp.planet.name + ': ' + fmtM(bp.pts) + ' pts = ' + bp.stars + ' stars</div>';
-      });
 
       html += '<div class="day-block">'
             + '<div class="day-block-header">'
@@ -5869,7 +6236,7 @@ function generateDayPlan() {
             + '</div>';
     });
 
-    const bc = BONUS_PLANETS.filter(b => bonusUnlocked(b.id)).length;
+    const bc = getActiveBonusPlanetIdsFromPlanDays(days).size;
     const ot = planResult?.opsSummary?.totalCompleted || 0;
     const om = planResult?.opsSummary?.totalPlatoons || 0;
     document.getElementById('pm-stars').textContent = totalStars + ' stars';
@@ -5892,12 +6259,9 @@ function showChain(c){
   ['ds','mx','ls'].forEach(ch=>document.getElementById('chain-'+ch).style.display=ch===c?'':'none');
 }
 
-// ═══════════════════════════════════════════════════════════════════
 // SHUTDOWN
-// ═══════════════════════════════════════════════════════════════════
 function shutdown(){if(confirm('Stop the ROTE Planner server?'))fetch('/shutdown').then(()=>document.body.innerHTML='<div style="background:#080c14;color:#f0c040;font-family:monospace;padding:3rem;font-size:1.2rem;text-align:center;min-height:100vh;display:flex;align-items:center;justify-content:center">Server stopped. You can close this tab.</div>');}
 
-// ═══════════════════════════════════════════════════════════════════
 // PLATOON ANALYSIS
 async function scanAndAnalyze() {
   await scanRosters();
@@ -6341,7 +6705,7 @@ function getPlatoonHtml(pid) {
   if(!projected && (!baseline || !baseline.length)) return '<div class="ops-pts-note">Operations auto-planned in the Operations tab.</div>';
   if(projected){
     return '<div class="ops-pts-note">Projected ops: '+projected.completedPlatoons+'/'+projected.totalPlatoons
-      +' platoons · '+fmtM(projected.points)+'</div>';
+      +' platoons | '+fmtM(projected.points)+'</div>';
   }
   const fillable = baseline.filter(platoon=>platoon.fillable).length;
   return '<div class="ops-pts-note">Isolated fillability: '+fillable+'/'+baseline.length+' platoons</div>';
@@ -6658,7 +7022,7 @@ loadPersistedAppState();
 
 <!-- floating shutdown button -->
 <div style="position:fixed;bottom:16px;right:16px;z-index:999">
-  <button class="btn" onclick="shutdown()" style="font-size:.6rem;padding:5px 12px;background:rgba(8,12,20,.9);border-color:var(--ds-dim);color:var(--ds)">⏹ Stop Server</button>
+  <button class="btn" onclick="shutdown()" style="font-size:.6rem;padding:5px 12px;background:rgba(8,12,20,.9);border-color:var(--ds-dim);color:var(--ds)">Stop Server</button>
 </div>
 </body>
 </html>"""
@@ -7039,7 +7403,12 @@ _SHIP_NAME_MAP = {
 _KNOWN_SHIP_DEFIDS = {str(k).upper().replace("_", "") for k in _SHIP_NAME_MAP.keys()}
 _KNOWN_CHARACTER_DEFIDS = {str(k).upper().replace("_", "") for k in _EXTRA_UNIT_NAME_MAP.keys()}
 _ability_name_map = {}
+_localization_value_map = {}
 _localization_maps_attempted = False
+_skill_meta_map = {}
+_unit_skill_reference_map = {}
+_unit_crew_map = {}
+_unit_crew_skill_reference_map = {}
 
 
 def _canonical_defid(value):
@@ -7191,6 +7560,29 @@ def _cache_name_maps():
         pass
 
 
+def _load_cached_name_maps():
+    changed = False
+    try:
+        unit_file = COMLINK_DIR / "unit_names.json"
+        if unit_file.exists() and not _unit_name_map:
+            data = json.loads(unit_file.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data:
+                _unit_name_map.update(data)
+                changed = True
+    except Exception:
+        pass
+    try:
+        ability_file = COMLINK_DIR / "ability_names.json"
+        if ability_file.exists() and not _ability_name_map:
+            data = json.loads(ability_file.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data:
+                _ability_name_map.update(data)
+                changed = True
+    except Exception:
+        pass
+    return changed
+
+
 def _merge_localization_bundle(loc_data):
     added_units = 0
     added_abilities = 0
@@ -7200,9 +7592,10 @@ def _merge_localization_bundle(loc_data):
         if not isinstance(key, str) or not isinstance(value, str):
             continue
         display = value.strip()
-        if not display or display.isupper():
+        if not display:
             continue
         key_up = _normalize_loc_key(key)
+        _localization_value_map[key_up] = display
         if key_up.startswith("UNIT_") and key_up.endswith("_NAME"):
             defid = key_up[5:-5]
             if defid and defid not in _unit_name_map:
@@ -7217,32 +7610,274 @@ def _merge_localization_bundle(loc_data):
     return added_units, added_abilities
 
 
+def _parse_localization_text(loc_text):
+    loc_map = {}
+    if not isinstance(loc_text, str):
+        return loc_map
+    for raw_line in loc_text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "|" not in line:
+            continue
+        key, value = line.split("|", 1)
+        key = key.strip()
+        value = value.strip()
+        if key and value:
+            loc_map[key] = value
+    return loc_map
+
+
+def _extract_localization_bundle(loc_payload):
+    if not isinstance(loc_payload, dict):
+        return {}
+    bundle = loc_payload.get("localizationBundle")
+    if isinstance(bundle, dict) and bundle:
+        return bundle
+    if isinstance(bundle, str) and bundle.strip():
+        try:
+            raw = base64.b64decode(bundle)
+        except Exception:
+            raw = bundle.encode("utf-8", errors="ignore")
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                target = next((name for name in zf.namelist() if name.upper().endswith("LOC_ENG_US.TXT")), None)
+                if not target and zf.namelist():
+                    target = zf.namelist()[0]
+                if target:
+                    return _parse_localization_text(zf.read(target).decode("utf-8", errors="replace"))
+        except Exception:
+            pass
+        try:
+            return _parse_localization_text(raw.decode("utf-8", errors="replace"))
+        except Exception:
+            return {}
+    return loc_payload if isinstance(loc_payload, dict) else {}
+
+
+def _lookup_localized_text(key, fallback=""):
+    normalized = _normalize_loc_key(key)
+    if not normalized:
+        return fallback or ""
+    return (_localization_value_map.get(normalized)
+            or _localization_value_map.get(normalized.replace("_", ""))
+            or fallback
+            or "")
+
+
+def _store_ability_name_map_entry(raw_id, display_name):
+    key = _normalize_loc_key(raw_id)
+    if not key or not display_name:
+        return False
+    changed = False
+    for candidate in (raw_id, key, key.replace("_", "")):
+        normalized = str(candidate or "").strip()
+        if not normalized:
+            continue
+        if _ability_name_map.get(normalized) != display_name:
+            _ability_name_map[normalized] = display_name
+            changed = True
+    return changed
+
+
+def _extract_skill_ids(skill_refs, first_only=False):
+    out = []
+    seen = set()
+    refs = skill_refs or []
+    if first_only and refs:
+        refs = refs[:1]
+    for entry in refs:
+        if isinstance(entry, dict):
+            skill_id = str(entry.get("skillId") or entry.get("id") or entry.get("abilityId") or "").strip()
+        else:
+            skill_id = str(entry or "").strip()
+        if not skill_id:
+            continue
+        skill_key = _normalize_loc_key(skill_id)
+        if skill_key in seen:
+            continue
+        seen.add(skill_key)
+        out.append(skill_id)
+    return out
+
+
+def _skill_row_from_meta(skill_id, raw_tier=0, unlocked=False):
+    meta = _skill_meta_map.get(_normalize_loc_key(skill_id), {})
+    try:
+        roster_tier = int(raw_tier)
+    except Exception:
+        roster_tier = 0
+    level = _skill_level_from_tier(roster_tier)
+    zeta_tiers = set(meta.get("zetaTiers") or [])
+    omicron_tiers = set(meta.get("omicronTiers") or [])
+    return {
+        "id": skill_id,
+        "skillId": skill_id,
+        "name": _lookup_ability_name(skill_id),
+        "tier": roster_tier,
+        "level": level,
+        "maxTier": int(meta.get("maxTier") or 0),
+        "kind": meta.get("kind") or _infer_skill_kind(skill_id),
+        "isZeta": bool(meta.get("isZeta")),
+        "isOmicron": bool(meta.get("isOmicron")),
+        "omicronArea": int(meta.get("omicronArea") or 0),
+        "hasZeta": any(tier_idx <= roster_tier for tier_idx in zeta_tiers),
+        "hasOmicron": any(tier_idx <= roster_tier for tier_idx in omicron_tiers),
+        "unlocked": bool(unlocked),
+    }
+
+
+def _collect_unit_skill_ids(def_id, combat_type=1):
+    base_key = _normalize_loc_key(def_id)
+    ordered = []
+    seen = set()
+
+    def _push(skill_ids):
+        for skill_id in skill_ids or []:
+            skill_id = str(skill_id or "").strip()
+            if not skill_id:
+                continue
+            skill_key = _normalize_loc_key(skill_id)
+            if skill_key in seen:
+                continue
+            seen.add(skill_key)
+            ordered.append(skill_id)
+
+    _push(_unit_skill_reference_map.get(base_key, []))
+    if int(combat_type or 1) == 2:
+        crew_skills = _unit_crew_skill_reference_map.get(base_key, [])
+        if crew_skills:
+            _push(crew_skills)
+        else:
+            for crew_unit_id in _unit_crew_map.get(base_key, []):
+                _push((_unit_skill_reference_map.get(_normalize_loc_key(crew_unit_id), []) or [])[:1])
+    return ordered
+
+
+def _populate_gamedata_name_maps(version):
+    global _skill_meta_map, _unit_skill_reference_map, _unit_crew_map, _unit_crew_skill_reference_map
+    if not version:
+        return False
+    changed = False
+    try:
+        skill_data = _comlink_post("data", payload={"version": version, "includePveUnits": False, "requestSegment": 1}, timeout=45)
+        ability_data = _comlink_post("data", payload={"version": version, "includePveUnits": False, "requestSegment": 2}, timeout=45)
+        unit_data = _comlink_post("data", payload={"version": version, "includePveUnits": False, "requestSegment": 3}, timeout=45)
+    except Exception:
+        return False
+
+    ability_name_by_id = {}
+    for ability in (ability_data.get("ability") or []):
+        if not isinstance(ability, dict):
+            continue
+        ability_id = str(ability.get("id") or "").strip()
+        name = _lookup_localized_text(ability.get("nameKey"))
+        if not ability_id or not name:
+            continue
+        ability_key = _normalize_loc_key(ability_id)
+        ability_name_by_id[ability_key] = name
+        changed = _store_ability_name_map_entry(ability_key, name) or changed
+
+    for skill in (skill_data.get("skill") or []):
+        if not isinstance(skill, dict):
+            continue
+        skill_id = str(skill.get("id") or "").strip()
+        ability_ref = str(skill.get("abilityReference") or "").strip()
+        name = ""
+        if ability_ref:
+            name = ability_name_by_id.get(_normalize_loc_key(ability_ref), "")
+        if not name:
+            name = _lookup_localized_text(skill.get("nameKey"))
+        if skill_id and name:
+            changed = _store_ability_name_map_entry(skill_id, name) or changed
+        if skill_id:
+            tier_rows = skill.get("tier") or []
+            zeta_tiers = []
+            omicron_tiers = []
+            for idx, tier_row in enumerate(tier_rows, start=1):
+                if not isinstance(tier_row, dict):
+                    continue
+                if tier_row.get("isZetaTier"):
+                    zeta_tiers.append(idx)
+                if tier_row.get("isOmicronTier"):
+                    omicron_tiers.append(idx)
+            _skill_meta_map[_normalize_loc_key(skill_id)] = {
+                "maxTier": (len(tier_rows) + 1) if isinstance(tier_rows, list) else 0,
+                "isZeta": bool(skill.get("isZeta")),
+                "isOmicron": bool(skill.get("omicronMode")),
+                "omicronArea": int(skill.get("omicronMode") or 0),
+                "kind": _infer_skill_kind(skill_id),
+                "zetaTiers": zeta_tiers,
+                "omicronTiers": omicron_tiers,
+            }
+
+    for unit in (unit_data.get("units") or []):
+        if not isinstance(unit, dict):
+            continue
+        base_id = _normalize_loc_key(unit.get("baseId") or unit.get("id") or "")
+        name = _lookup_localized_text(unit.get("nameKey"))
+        if base_id and name and _unit_name_map.get(base_id) != name:
+            _unit_name_map[base_id] = name
+            changed = True
+        if base_id:
+            _unit_skill_reference_map[base_id] = _extract_skill_ids(unit.get("skillReference") or [])
+            crew_unit_ids = []
+            crew_skill_ids = []
+            for crew_entry in (unit.get("crew") or []):
+                if not isinstance(crew_entry, dict):
+                    continue
+                crew_unit_id = str(crew_entry.get("unitId") or "").strip()
+                if crew_unit_id:
+                    crew_unit_ids.append(_normalize_loc_key(crew_unit_id))
+                crew_skill_ids.extend(_extract_skill_ids(crew_entry.get("skillReference") or [], first_only=True))
+            _unit_crew_map[base_id] = crew_unit_ids
+            _unit_crew_skill_reference_map[base_id] = crew_skill_ids
+
+    return changed
+
+
 def _ensure_localization_maps(force=False):
     global _localization_maps_attempted
+    _load_cached_name_maps()
     if _localization_maps_attempted and not force:
         return
-    if _unit_name_map and _ability_name_map and not force:
+    if _unit_name_map and _ability_name_map and _skill_meta_map and _unit_skill_reference_map and not force:
         _localization_maps_attempted = True
         return
 
-    payloads = [
+    bundle_id = ""
+    game_version = ""
+    try:
+        meta = _comlink_post("metadata", timeout=10)
+        if isinstance(meta, dict):
+            bundle_id = str(meta.get("latestLocalizationBundleVersion") or "").strip()
+            game_version = str(meta.get("latestGamedataVersion") or "").strip()
+    except Exception:
+        bundle_id = ""
+        game_version = ""
+
+    payloads = []
+    if bundle_id:
+        payloads.append({"id": bundle_id})
+    payloads.extend([
         {"id": "Loc_ENG_US.txt", "unzip": True},
         {"id": "Loc_ENG_US.txt"},
         {"language": "ENG_US"},
         {},
-    ]
+    ])
     for payload in payloads:
         try:
             loc = _comlink_post("localization", payload=payload, timeout=10)
         except Exception:
             continue
-        loc_data = loc.get("localizationBundle") if isinstance(loc, dict) else {}
-        if not isinstance(loc_data, dict) or not loc_data:
-            loc_data = loc if isinstance(loc, dict) else {}
+        loc_data = _extract_localization_bundle(loc)
         unit_added, ability_added = _merge_localization_bundle(loc_data)
         if unit_added or ability_added:
-            _cache_name_maps()
             break
+
+    if _localization_value_map and game_version:
+        _populate_gamedata_name_maps(game_version)
+
+    if _unit_name_map or _ability_name_map:
+        _cache_name_maps()
     _localization_maps_attempted = True
 
 
@@ -7285,11 +7920,52 @@ def _lookup_ability_name(skill_id, fallback=""):
     raw = str(skill_id or "").strip()
     upper = _normalize_loc_key(raw)
     flat = upper.replace("_", "")
-    return (_ability_name_map.get(raw)
-            or _ability_name_map.get(upper)
-            or _ability_name_map.get(flat)
-            or fallback
-            or "")
+    candidates = [raw, upper, flat]
+
+    def _extend_with(prefix, suffix):
+        clean_suffix = _normalize_loc_key(suffix)
+        if not clean_suffix:
+            return
+        candidates.extend([
+            f"{prefix}_{clean_suffix}",
+            f"{prefix}_{clean_suffix}_NAME",
+            f"{prefix}{clean_suffix}",
+            f"{prefix}{clean_suffix}_NAME",
+        ])
+
+    lower = raw.lower()
+    if lower.startswith("basicskill_"):
+        _extend_with("BASICABILITY", raw[len("basicskill_"):])
+    elif lower.startswith("specialskill_"):
+        _extend_with("SPECIALABILITY", raw[len("specialskill_"):])
+    elif lower.startswith("leaderskill_"):
+        _extend_with("LEADERABILITY", raw[len("leaderskill_"):])
+    elif lower.startswith("uniqueskill_"):
+        _extend_with("UNIQUEABILITY", raw[len("uniqueskill_"):])
+    elif lower.startswith("contractskill_"):
+        suffix = raw[len("contractskill_"):]
+        _extend_with("CONTRACTABILITY", suffix)
+        _extend_with("PAYOUTABILITY", suffix)
+        _extend_with("CONTRACT", suffix)
+    elif lower.startswith("crew_"):
+        _extend_with("CREWABILITY", raw[len("crew_"):])
+    elif lower.startswith("hardware_"):
+        _extend_with("HARDWAREABILITY", raw[len("hardware_"):])
+    elif lower.startswith("ultimateability_"):
+        _extend_with("ULTIMATEABILITY", raw[len("ultimateability_"):])
+
+    seen = set()
+    for candidate in candidates:
+        candidate = str(candidate or "").strip()
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        value = (_ability_name_map.get(candidate)
+                 or _ability_name_map.get(_normalize_loc_key(candidate))
+                 or _ability_name_map.get(_normalize_loc_key(candidate).replace("_", "")))
+        if value:
+            return value
+    return fallback or ""
 
 
 def _skill_level_from_tier(raw_tier):
@@ -7300,48 +7976,124 @@ def _skill_level_from_tier(raw_tier):
     return tier + 2 if tier > 0 else 0
 
 
-def _simplify_skills(unit):
-    skills = []
-    seen = set()
+def _hydrate_skill_names_in_rosters(rosters):
+    changed = False
+    if not isinstance(rosters, dict) or not rosters:
+        return changed
+    _ensure_localization_maps()
+    if not _ability_name_map and not _unit_name_map:
+        return changed
+    for roster in rosters.values():
+        if not isinstance(roster, list):
+            continue
+        for unit in roster:
+            if not isinstance(unit, dict):
+                continue
+            def_id = unit.get("defId") or unit.get("baseId") or unit.get("definitionId") or ""
+            combat_type = unit.get("combatType") or _infer_combat_type(def_id)
+            if not str(unit.get("name") or "").strip():
+                display_name = _lookup_unit_name(def_id)
+                if display_name:
+                    unit["name"] = display_name
+                    changed = True
+            current_skills = unit.get("skills") or []
+            if _skill_meta_map and _unit_skill_reference_map:
+                expanded_skills = _simplify_skills(unit, def_id=def_id, combat_type=combat_type)
+                needs_refresh = len(expanded_skills) != len(current_skills)
+                if not needs_refresh and expanded_skills:
+                    for idx, skill in enumerate(expanded_skills):
+                        current = current_skills[idx] if idx < len(current_skills) and isinstance(current_skills[idx], dict) else {}
+                        if (
+                            current.get("name") != skill.get("name")
+                            or current.get("maxTier") != skill.get("maxTier")
+                            or current.get("hasZeta") != skill.get("hasZeta")
+                            or current.get("hasOmicron") != skill.get("hasOmicron")
+                        ):
+                            needs_refresh = True
+                            break
+                if needs_refresh and expanded_skills:
+                    unit["skills"] = expanded_skills
+                    current_skills = expanded_skills
+                    changed = True
+            for skill in current_skills:
+                if not isinstance(skill, dict):
+                    continue
+                if str(skill.get("name") or "").strip():
+                    continue
+                skill_id = str(skill.get("id") or skill.get("skillId") or skill.get("abilityId") or "").strip()
+                if not skill_id:
+                    continue
+                ability_name = _lookup_ability_name(skill_id)
+                if ability_name:
+                    skill["name"] = ability_name
+                    changed = True
+    return changed
+
+
+def _simplify_skills(unit, def_id="", combat_type=1):
+    roster_skill_tiers = {}
+    purchased_skill_ids = []
     for skill in (unit.get("skill") or unit.get("skills") or []):
         if not isinstance(skill, dict):
             continue
         skill_id = str(skill.get("id") or skill.get("skillId") or skill.get("abilityId") or "").strip()
         if not skill_id:
             continue
+        try:
+            roster_skill_tiers[_normalize_loc_key(skill_id)] = int(skill.get("tier") or 0)
+        except Exception:
+            roster_skill_tiers[_normalize_loc_key(skill_id)] = 0
+
+    seen = set()
+    skills = []
+
+    def _push_skill(skill_id, raw_tier=0, unlocked=False):
+        skill_id = str(skill_id or "").strip()
+        if not skill_id:
+            return
         skill_key = _normalize_loc_key(skill_id)
+        if skill_key in seen:
+            return
         seen.add(skill_key)
-        raw_tier = skill.get("tier")
-        skills.append({
-            "id": skill_id,
-            "name": _lookup_ability_name(skill_id),
-            "tier": int(raw_tier) if str(raw_tier).isdigit() else 0,
-            "level": _skill_level_from_tier(raw_tier),
-            "kind": _infer_skill_kind(skill_id),
-        })
+        row = _skill_row_from_meta(skill_id, raw_tier=raw_tier, unlocked=unlocked)
+        if not row.get("name"):
+            row["name"] = _fallback_ability_name(skill_id)
+        skills.append(row)
+
+    for skill_id in _collect_unit_skill_ids(def_id, combat_type):
+        _push_skill(skill_id, raw_tier=roster_skill_tiers.get(_normalize_loc_key(skill_id), 1))
+
+    for skill_key, raw_tier in roster_skill_tiers.items():
+        if skill_key in seen:
+            continue
+        source_id = next(
+            (str(skill.get("id") or skill.get("skillId") or skill.get("abilityId") or "").strip()
+             for skill in (unit.get("skill") or unit.get("skills") or [])
+             if _normalize_loc_key(skill.get("id") or skill.get("skillId") or skill.get("abilityId")) == skill_key),
+            skill_key,
+        )
+        _push_skill(source_id, raw_tier=raw_tier)
 
     for skill_id in (unit.get("purchasedAbilityId") or []):
         skill_id = str(skill_id or "").strip()
         if not skill_id:
             continue
-        skill_key = _normalize_loc_key(skill_id)
-        if skill_key in seen:
-            continue
-        skills.append({
-            "id": skill_id,
-            "name": _lookup_ability_name(skill_id, "Ultimate"),
-            "tier": 0,
-            "level": 0,
-            "kind": _infer_skill_kind(skill_id),
-            "unlocked": True,
-        })
+        purchased_skill_ids.append(skill_id)
+        _push_skill(skill_id, raw_tier=0, unlocked=True)
+
     return skills
 
 def _load_app_state():
     try:
         if APP_STATE_FILE.exists():
             data = json.loads(APP_STATE_FILE.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
+            if isinstance(data, dict):
+                if _hydrate_skill_names_in_rosters(data.get("guildRosters")):
+                    try:
+                        APP_STATE_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                    except Exception:
+                        pass
+                return data
     except Exception:
         pass
     return {}
@@ -7895,6 +8647,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/api/player":
             ac = str(payload.get("allyCode", "")).replace("-", "").strip()
+            _ensure_localization_maps(force=not (_skill_meta_map and _unit_skill_reference_map))
             data, status = self.proxy("player", {"payload": {"allyCode": ac}})
             self.send_json(data, status)
 
@@ -8010,6 +8763,7 @@ class Handler(BaseHTTPRequestHandler):
             if player is None or status != 200:
                 self.send_json({"error": f"Roster fetch failed for '{raw}'"}, 502)
                 return
+            _ensure_localization_maps(force=not (_skill_meta_map and _unit_skill_reference_map))
             roster = player.get("rosterUnit", [])
             simplified = []
             scan_errors = []
@@ -8111,7 +8865,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not def_id:
                     scan_errors.append({"issue":"missing_defId","unit_keys":list(unit.keys())[:8]})
                     continue
-                ability_rows = _simplify_skills(unit)
+                ability_rows = _simplify_skills(unit, def_id=def_id, combat_type=ctype)
                 simplified.append({
                     "defId":      def_id,
                     "name":       _lookup_unit_name(
@@ -8555,3 +9309,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

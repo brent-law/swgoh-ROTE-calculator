@@ -31,6 +31,16 @@ try:
     from rote_ops_fallback import build_wiki_tb_defs as _build_wiki_tb_defs_from_module
 except Exception:
     _build_wiki_tb_defs_from_module = None
+try:
+    from swgoh_comlink import SwgohComlink as _StatCalcComlinkClient
+    from swgoh_comlink import StatCalc as _LocalStatCalc
+    from swgoh_comlink import GameDataBuilder as _StatCalcGameDataBuilder
+    _STATCALC_IMPORT_ERROR = ""
+except Exception as _statcalc_import_exc:
+    _StatCalcComlinkClient = None
+    _LocalStatCalc = None
+    _StatCalcGameDataBuilder = None
+    _STATCALC_IMPORT_ERROR = str(_statcalc_import_exc)
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle each request in a separate thread."""
@@ -150,8 +160,9 @@ HTML_APP = r"""<!DOCTYPE html>
   --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
   --radius:8px;--radius-lg:14px;
 }
+html{font-size:17px}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;line-height:1.35}
 body::before{content:'';position:fixed;inset:0;background:
   radial-gradient(ellipse at 15% 50%,rgba(192,57,43,0.05) 0%,transparent 55%),
   radial-gradient(ellipse at 85% 50%,rgba(41,128,185,0.05) 0%,transparent 55%),
@@ -849,7 +860,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
   </div>
 
   <!-- Sort bar -->
-  <div id="roster-sort-bar" style="display:grid;grid-template-columns:1.8fr .8fr .7fr .7fr 3fr;
+  <div id="roster-sort-bar" style="display:grid;grid-template-columns:1.7fr .8fr .7fr .8fr .9fr 3fr;
               gap:4px;padding:4px 8px;background:var(--bg2);border-radius:var(--radius);
               margin-bottom:4px;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;
               color:var(--text3)">
@@ -857,6 +868,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
     <button onclick="sortRoster('type')"    id="rs-type"  class="roster-sort-btn">Type</button>
     <button onclick="sortRoster('stars')"   id="rs-stars" class="roster-sort-btn">★</button>
     <button onclick="sortRoster('level')"   id="rs-level" class="roster-sort-btn">Gear/Relic</button>
+    <button onclick="sortRoster('power')"   id="rs-power" class="roster-sort-btn">Power</button>
     <span style="padding:2px 4px">Abilities</span>
   </div>
 
@@ -3410,7 +3422,7 @@ function isShipUnit(unit){
 function normalizeRosterUnit(unit){
   if(!unit || typeof unit !== 'object') return unit;
   const defId = normalizeDefId(unit.defId || unit.baseId);
-  return {...unit, defId, combatType: inferUnitCombatType(unit)};
+  return {...unit, defId, combatType: inferUnitCombatType(unit), power: Number(unit.power)||0};
 }
 
 function normalizeGuildRostersData(rosters){
@@ -3459,7 +3471,7 @@ function inferUnitCombatType(unit){
 function normalizeRosterUnit(unit){
   if(!unit || typeof unit !== 'object') return unit;
   const defId = normalizeDefId(unit.defId || unit.baseId);
-  return {...unit, defId, combatType: inferUnitCombatType(unit)};
+  return {...unit, defId, combatType: inferUnitCombatType(unit), power: Number(unit.power)||0};
 }
 
 function unitMatchesDefId(unit, defId){
@@ -4160,7 +4172,7 @@ function filterRoster(){
 }
 
 function sortRoster(key, keepDir){
-  const allowed = new Set(['name','type','stars','level']);
+  const allowed = new Set(['name','type','stars','level','power']);
   if(!allowed.has(key)) key = 'name';
   if(!keepDir){
     if(_rosterSort.key===key) _rosterSort.dir *= -1;
@@ -4173,7 +4185,7 @@ function sortRoster(key, keepDir){
   }
   // Update sort button styles
   document.querySelectorAll('.roster-sort-btn').forEach(b=>b.classList.remove('active'));
-  const colMap={name:'rs-name',type:'rs-type',stars:'rs-stars',level:'rs-level'};
+  const colMap={name:'rs-name',type:'rs-type',stars:'rs-stars',level:'rs-level',power:'rs-power'};
   const btn=document.getElementById(colMap[_rosterSort.key]);
   if(btn) btn.classList.add('active');
 
@@ -4184,6 +4196,7 @@ function sortRoster(key, keepDir){
       case 'type':     return d*(inferUnitCombatType(a)-inferUnitCombatType(b));
       case 'stars':    return d*(a.rarity-b.rarity);
       case 'level':    return d*((a.relic>0?a.relic+20:a.gear)-(b.relic>0?b.relic+20:b.gear));
+      case 'power':    return d*((Number(a.power)||0)-(Number(b.power)||0));
       default: return 0;
     }
   });
@@ -4227,24 +4240,25 @@ function abilityLevelLabel(skill){
   return tier > 0 ? 'Tier '+tier : '';
 }
 
+function formatUnitPower(value){
+  const power = Number(value)||0;
+  return power > 0 ? power.toLocaleString() : '<span style="color:var(--text3)">-</span>';
+}
+
 function renderAbilitySummary(rawDefId, unit){
   const skills = Array.isArray(unit?.skills) ? unit.skills : [];
   if(!skills.length){
     return '<span style="color:var(--text3)">Re-scan to load abilities</span>';
   }
-  const meta = UNIT_ABILITIES[rawDefId] || {z:[], o:[]};
-  const zNames = new Set((meta.z || []).map(normalizeUnitName));
-  const oNames = new Set((meta.o || []).map(normalizeUnitName));
   const counters = {special:0, unique:0, contract:0, crew:0, hardware:0};
   return skills.map((skill, idx)=>{
     const displayName = fallbackAbilityName(skill, idx, counters);
     const levelLabel = abilityLevelLabel(skill);
     const badges = [];
-    const normalizedAbility = normalizeUnitName(displayName);
-    if(skill?.hasZeta || zNames.has(normalizedAbility)){
+    if(skill?.hasZeta){
       badges.push('<span style="font-size:.56rem;color:#b58cff;border:1px solid rgba(181,140,255,.45);border-radius:999px;padding:0 5px">Z</span>');
     }
-    if(skill?.hasOmicron || oNames.has(normalizedAbility)){
+    if(skill?.hasOmicron){
       badges.push('<span style="font-size:.56rem;color:#ff8d8d;border:1px solid rgba(255,141,141,.45);border-radius:999px;padding:0 5px">O</span>');
     }
     return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-size:.64rem;line-height:1.25;margin-bottom:2px">'+
@@ -4268,11 +4282,14 @@ function renderRosterList(){
   if(summary){
     const r7=chars.filter(u=>(Number(u.relic)||0)>=7).length;
     const r5=chars.filter(u=>(Number(u.relic)||0)>=5).length;
-    const scanHint=chars.length && !chars.some(u=>Array.isArray(u.skills) && u.skills.length>0)
+    const abilityHint = chars.length && !chars.some(u=>Array.isArray(u.skills) && u.skills.length>0)
       ? ' | re-scan rosters to load ability details'
       : '';
+    const powerHint = total && !_rosterFiltered.some(u=>(Number(u.power)||0)>0)
+      ? ' | re-scan rosters to load unit power'
+      : '';
     summary.textContent=total+' units | '+chars.length+' characters | '+ships.length+' ships | '+
-      r7+' R7+ | '+r5+' R5+'+scanHint;
+      r7+' R7+ | '+r5+' R5+'+abilityHint+powerHint;
   }
 
   if(total===0){
@@ -4293,8 +4310,9 @@ function renderRosterList(){
       const rosterStarStr=Array.from({length:Number(u.rarity)||0}, ()=> '&#9733;').join('');
       const rosterLevelClr=isShip ? 'var(--text3)' : (u.relic>=9?'#e74c3c':u.relic>=7?'var(--gold)':
                             u.relic>=5?'#27ae60':'var(--text3)');
+      const rosterPowerStr=formatUnitPower(u.power);
       const rosterAbilityHtml=renderAbilitySummary(raw_did, u);
-      return '<div style="display:grid;grid-template-columns:1.8fr .8fr .7fr .7fr 3fr;'+
+      return '<div style="display:grid;grid-template-columns:1.7fr .8fr .7fr .8fr .9fr 3fr;'+
         'gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);align-items:flex-start;'+
         'transition:background .1s" onmouseover="this.style.background=\'var(--bg4)\'"'+
         ' onmouseout="this.style.background=\'transparent\'">'+
@@ -4302,6 +4320,7 @@ function renderRosterList(){
         '<span style="font-size:.7rem;color:var(--text2)">'+rosterTypeStr+'</span>'+
         '<span style="font-size:.7rem;color:var(--gold2)">'+rosterStarStr+'</span>'+
         '<span style="font-size:.75rem;color:'+rosterLevelClr+'">'+rosterLevelStr+'</span>'+
+        '<span style="font-size:.72rem;color:var(--text2)">'+rosterPowerStr+'</span>'+
         '<div style="font-size:.64rem;color:var(--text2)">'+rosterAbilityHtml+'</div>'+
         '</div>';
     }).join('');
@@ -4611,6 +4630,26 @@ async function scanRosters(){
   const total = members.length;
   const btn = document.getElementById('scan-btn');
   _scanCancelled = false;
+  try{
+    await fetch('/api/reset-scan-session', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  }catch(err){
+    console.warn('[ROTE] Scan session reset skipped:', err.message);
+  }
+
+  guildRosters = {};
+  _platoonAnalysis = {};
+  _rosterData = [];
+  _rosterFiltered = [];
+  invalidateOperationsCaches();
+  rebuildUnitNameIndex();
+  updateOperationsTabVisibility();
+  populateMemberDropdown();
+  initRosterTab();
+  const rosterAnalysis = document.getElementById('roster-analysis');
+  if(rosterAnalysis) rosterAnalysis.style.display='none';
+  [...document.getElementById('member-grid').querySelectorAll('.member-card')].forEach(card=>{
+    card.style.borderColor = 'rgba(93,173,226,0.18)';
+  });
 
   // Build/show progress UI
   let pb = document.getElementById('scan-pb');
@@ -4628,25 +4667,9 @@ async function scanRosters(){
   const pbf = document.getElementById('scan-pb-fill');
   const pbt = document.getElementById('scan-pb-text');
   btn.disabled=true; btn.textContent='Scanning...';
-
-  // Check if this is a resume (some members already scanned)
-  const alreadyDone = Object.keys(guildRosters).length;
-  if(alreadyDone > 0){
-    showImportStatus('Resuming scan — '+alreadyDone+' members already retrieved, fetching remaining '+
-      (total-alreadyDone)+'...','loading');
-  } else {
-    guildRosters = {};
-    rebuildUnitNameIndex();
-  }
+  showImportStatus('Starting a fresh roster scan for '+total+' members...','loading');
   const unitCounts = {};
   KEY_UNITS.forEach(u=>unitCounts[normalizeDefId(u.defId).toUpperCase()]=0);
-  // Rebuild unit counts from already-scanned members
-  Object.values(guildRosters).forEach(roster=>{
-    KEY_UNITS.forEach(u=>{
-      const unit=(roster||[]).find(x=>unitMatchesDefId(x, u.defId));
-      if(unit&&(Number(unit.relic)||0)>=(u.relic||0)) unitCounts[normalizeDefId(u.defId).toUpperCase()]++;
-    });
-  });
 
   // Sequential with retry + comlink health monitoring
   // Sequential avoids overwhelming comlink; retry handles transient failures
@@ -4663,13 +4686,6 @@ async function scanRosters(){
     const ac = m.allyCode||m.allycode||m.ally_code||m.playerId||m.memberExternalId||m.externalId;
 
     if(!ac){ done++; continue; }
-
-    // Skip members we already have data for (supports resume after failure)
-    if(guildRosters[ac] && guildRosters[ac].length > 0){
-      const cards=[...document.getElementById('member-grid').querySelectorAll('.member-card')];
-      if(cards[i]) cards[i].style.borderColor='rgba(39,174,96,0.4)';
-      done++; continue;
-    }
 
     // If comlink went offline, wait for recovery before continuing
     if(consecFails >= 3){
@@ -5020,8 +5036,6 @@ function buildAppStateSnapshot(){
     version: APP_STATE_VERSION,
     savedAt: new Date().toISOString(),
     primaryAllyCode: _primaryAllyCode,
-    guildSummary: getCurrentGuildSummary(),
-    guildRosters: normalizeGuildRostersData(guildRosters),
     guideData: normalizeGuideData(guideData),
     opsDefinitions: normalizeOperationsDefinitionsData(_opsDefinitions),
     pState: JSON.parse(JSON.stringify(pState)),
@@ -5036,15 +5050,10 @@ function buildAppStateSnapshot(){
       fleetBase: flBase(),
       fleetFalloff: flFall(),
     },
-    lastPlanStars: _planDirty ? null : _lastPlanStars,
-    lastPlanResult: _planDirty ? null : _lastPlanResult,
     optimizerWarningAccepted: _optimizerWarningAccepted,
     operationsSelection: {day: _opsSelectedDay, planet: _opsSelectedPlanet},
-    platoonAnalysis: _platoonAnalysis,
     activeGuide: _activeGuide,
     expandedGuidePlanets: _expandedPlanets,
-    selectedGuideMember: document.getElementById('guide-member-sel')?.value || '',
-    selectedRosterMember: document.getElementById('roster-member-sel')?.value || '',
   };
 }
 
@@ -5095,11 +5104,6 @@ function applyPersistedAppState(state){
       for(let i=0;i<6;i++) dailyUndep[i] = Number(state.dailyUndep[i]) || 0;
     }
 
-    if(state.guildSummary) renderGuildSummary(state.guildSummary, {silent:true, preserveScans:true});
-
-    guildRosters = normalizeGuildRostersData(state.guildRosters || {});
-    rebuildUnitNameIndex();
-
     if(state.guideData) guideData = normalizeGuideData(state.guideData);
     if(state.opsDefinitions) _opsDefinitions = normalizeOperationsDefinitionsData(state.opsDefinitions);
     if(state.pState && typeof state.pState === 'object'){
@@ -5117,13 +5121,9 @@ function applyPersistedAppState(state){
       });
     }
 
-    _platoonAnalysis = (state.platoonAnalysis && typeof state.platoonAnalysis === 'object')
-      ? state.platoonAnalysis
-      : {};
-    _lastPlanResult = (state.lastPlanResult && Array.isArray(state.lastPlanResult.days))
-      ? state.lastPlanResult
-      : null;
-    _lastPlanStars = state.lastPlanStars ?? null;
+    _platoonAnalysis = {};
+    _lastPlanResult = null;
+    _lastPlanStars = null;
     _optimizerWarningAccepted = !!state.optimizerWarningAccepted;
     _opsSelectedDay = Math.max(1, Number(state.operationsSelection?.day) || 1);
     _opsSelectedPlanet = String(state.operationsSelection?.planet || '').trim();
@@ -5137,34 +5137,16 @@ function applyPersistedAppState(state){
     renderFalloffViz();
     refreshGuideUnitLinks();
 
-    if(scannedRosterCount() > 0){
-      renderRosterAnalysis(recountKeyUnits(), scannedRosterCount());
-    }
-
     populateMemberDropdown();
     initRosterTab();
-
-    const guideSel = document.getElementById('guide-member-sel');
-    if(guideSel && state.selectedGuideMember) guideSel.value = state.selectedGuideMember;
-
-    const rosterSel = document.getElementById('roster-member-sel');
-    if(rosterSel && state.selectedRosterMember){
-      rosterSel.value = state.selectedRosterMember;
-      loadMemberRoster(state.selectedRosterMember);
-    }
 
     if(document.getElementById('chain-ds').innerHTML) rebuildPlannerChains();
     if(_activeGuide) renderGuideMission(_activeGuide.pid, _activeGuide.mid);
     updateOperationsTabVisibility();
     renderDayPlanGuide();
-    if(hasCompletedOptimization()){
-      renderOptPlan(_lastPlanResult, 'saved', []);
-      const status = document.getElementById('opt-status-line');
-      if(status) status.textContent = 'Loaded the last saved optimization result. Select an algorithm to rerun or compare.';
-    }
     if(document.getElementById('panel-operations')?.classList.contains('active')) initOperationsTab();
     calcSummary();
-    updateDayPlanUiState({preserveStatus: hasCompletedOptimization()});
+    updateDayPlanUiState({preserveStatus: false});
   } finally {
     _appStateHydrating = false;
   }
@@ -7270,6 +7252,15 @@ _tb_defs_cache  = None  # None=not attempted  {}=failed  dict=success
 _tb_defs_fallback_cache = None
 _unit_name_reverse_index = None
 APP_STATE_FILE  = COMLINK_DIR / "app_state.json"
+_VOLATILE_APP_STATE_KEYS = {
+    "guildSummary",
+    "guildRosters",
+    "lastPlanResult",
+    "lastPlanStars",
+    "platoonAnalysis",
+    "selectedGuideMember",
+    "selectedRosterMember",
+}
 
 _EXTRA_UNIT_NAME_MAP = {
     "4LOM":"4-LOM",
@@ -7409,6 +7400,12 @@ _skill_meta_map = {}
 _unit_skill_reference_map = {}
 _unit_crew_map = {}
 _unit_crew_skill_reference_map = {}
+_statcalc_instance = None
+_statcalc_lock = threading.Lock()
+_statcalc_calc_lock = threading.Lock()
+_statcalc_last_attempt = 0.0
+_statcalc_last_error = ""
+_STATCALC_RETRY_SECONDS = 30.0
 
 
 def _canonical_defid(value):
@@ -7434,6 +7431,146 @@ def _lookup_unit_name(def_id, fallback=""):
             or _SHIP_NAME_MAP.get(key)
             or fallback
             or "")
+
+
+def _coerce_int(value, default=0):
+    try:
+        if value in (None, ""):
+            return default
+        return int(float(str(value).replace(",", "").strip()))
+    except Exception:
+        return default
+
+
+def _extract_unit_power(unit):
+    if not isinstance(unit, dict):
+        return 0
+    for key in ("gp", "power", "galacticPower", "unitPower"):
+        value = unit.get(key)
+        if value not in (None, ""):
+            coerced = _coerce_int(value, 0)
+            if coerced > 0:
+                return coerced
+    return 0
+
+
+def _ensure_statcalc(force=False):
+    global _statcalc_instance, _statcalc_last_attempt, _statcalc_last_error
+    if _statcalc_instance is not None and not force:
+        return _statcalc_instance
+    now = time.time()
+    if (not force and _statcalc_instance is None and _statcalc_last_error
+            and (now - _statcalc_last_attempt) < _STATCALC_RETRY_SECONDS):
+        return None
+    with _statcalc_lock:
+        if _statcalc_instance is not None and not force:
+            return _statcalc_instance
+        _statcalc_last_attempt = now
+        if _LocalStatCalc is None or _StatCalcComlinkClient is None or _StatCalcGameDataBuilder is None:
+            _statcalc_last_error = _STATCALC_IMPORT_ERROR or "swgoh-comlink Python package is unavailable."
+            return None
+        try:
+            print("Initializing local StatCalc for unit power...")
+            with _StatCalcComlinkClient(url=f"http://127.0.0.1:{COMLINK_PORT}") as comlink_client:
+                game_data = _StatCalcGameDataBuilder(comlink_client).build()
+            _statcalc_instance = _LocalStatCalc(game_data=game_data)
+            _statcalc_last_error = ""
+            print("Local StatCalc ready.")
+            return _statcalc_instance
+        except Exception as exc:
+            _statcalc_instance = None
+            _statcalc_last_error = str(exc)
+            print(f"Local StatCalc init failed: {_statcalc_last_error}")
+            return None
+
+
+def _apply_roster_power(player):
+    global _statcalc_last_error
+    roster = []
+    if isinstance(player, dict):
+        roster = player.get("rosterUnit") or []
+    if not isinstance(roster, list) or not roster:
+        return False
+    if all(_extract_unit_power(unit) > 0 for unit in roster if isinstance(unit, dict)):
+        return True
+    calc = _ensure_statcalc()
+    if calc is None:
+        return False
+
+    def _normalized_skills(unit):
+        out = []
+        for skill in (unit.get("skill") or unit.get("skills") or []):
+            if not isinstance(skill, dict):
+                continue
+            skill_id = str(skill.get("id") or skill.get("skillId") or skill.get("abilityId") or "").strip()
+            if not skill_id:
+                continue
+            try:
+                raw_tier = int(skill.get("tier") or 0)
+            except Exception:
+                raw_tier = 0
+            out.append({"id": skill_id, "tier": raw_tier + 2})
+        return out
+
+    def _normalized_char(unit):
+        def_id = _canonical_defid(unit.get("definitionId") or unit.get("defId") or unit.get("baseId"))
+        return {
+            "defId": def_id,
+            "rarity": _coerce_int(unit.get("currentRarity") or unit.get("rarity"), 0),
+            "level": _coerce_int(unit.get("currentLevel") or unit.get("level"), 0),
+            "gear": _coerce_int(unit.get("currentTier") or unit.get("gear"), 0),
+            "equipped": unit.get("equipment") or unit.get("equipped") or [],
+            "equippedStatMod": unit.get("equippedStatMod"),
+            "mods": unit.get("mods"),
+            "relic": unit.get("relic"),
+            "skills": _normalized_skills(unit),
+            "purchasedAbilityId": list(unit.get("purchasedAbilityId") or []),
+        }
+
+    def _normalized_ship(unit):
+        def_id = _canonical_defid(unit.get("definitionId") or unit.get("defId") or unit.get("baseId"))
+        return {
+            "defId": def_id,
+            "rarity": _coerce_int(unit.get("currentRarity") or unit.get("rarity"), 0),
+            "level": _coerce_int(unit.get("currentLevel") or unit.get("level"), 0),
+            "skills": _normalized_skills(unit),
+        }
+
+    errors = []
+    try:
+        with _statcalc_calc_lock:
+            char_lookup = {}
+            ship_units = []
+            for unit in roster:
+                if not isinstance(unit, dict):
+                    continue
+                def_id = _canonical_defid(unit.get("definitionId") or unit.get("defId") or unit.get("baseId"))
+                if not def_id:
+                    continue
+                combat_type = unit.get("combatType") or unit.get("type")
+                if _infer_combat_type(def_id, combat_type) == 2:
+                    ship_units.append(unit)
+                    continue
+                normalized = _normalized_char(unit)
+                try:
+                    unit["gp"] = calc.calc_char_gp(normalized)
+                    char_lookup[_normalize_loc_key(def_id)] = normalized
+                except Exception as exc:
+                    errors.append(f"{def_id}: {exc}")
+            for unit in ship_units:
+                def_id = _canonical_defid(unit.get("definitionId") or unit.get("defId") or unit.get("baseId"))
+                crew_ids = _unit_crew_map.get(_normalize_loc_key(def_id), [])
+                crew = [char_lookup[cid] for cid in crew_ids if cid in char_lookup]
+                try:
+                    unit["gp"] = calc.calc_ship_gp(_normalized_ship(unit), crew)
+                except Exception as exc:
+                    errors.append(f"{def_id}: {exc}")
+        _statcalc_last_error = "; ".join(errors[:3]) if errors else ""
+        return any(_extract_unit_power(unit) > 0 for unit in roster if isinstance(unit, dict))
+    except Exception as exc:
+        _statcalc_last_error = str(exc)
+        print(f"Local StatCalc roster power failed: {_statcalc_last_error}")
+        return False
 
 
 def _normalize_unit_name_lookup(value):
@@ -7558,6 +7695,34 @@ def _cache_name_maps():
             )
     except Exception:
         pass
+    try:
+        if _skill_meta_map:
+            (COMLINK_DIR / "skill_meta.json").write_text(
+                json.dumps(_skill_meta_map, indent=2), encoding="utf-8"
+            )
+    except Exception:
+        pass
+    try:
+        if _unit_skill_reference_map:
+            (COMLINK_DIR / "unit_skill_refs.json").write_text(
+                json.dumps(_unit_skill_reference_map, indent=2), encoding="utf-8"
+            )
+    except Exception:
+        pass
+    try:
+        if _unit_crew_map:
+            (COMLINK_DIR / "unit_crew_map.json").write_text(
+                json.dumps(_unit_crew_map, indent=2), encoding="utf-8"
+            )
+    except Exception:
+        pass
+    try:
+        if _unit_crew_skill_reference_map:
+            (COMLINK_DIR / "unit_crew_skill_refs.json").write_text(
+                json.dumps(_unit_crew_skill_reference_map, indent=2), encoding="utf-8"
+            )
+    except Exception:
+        pass
 
 
 def _load_cached_name_maps():
@@ -7577,6 +7742,45 @@ def _load_cached_name_maps():
             data = json.loads(ability_file.read_text(encoding="utf-8"))
             if isinstance(data, dict) and data:
                 _ability_name_map.update(data)
+                changed = True
+    except Exception:
+        pass
+    try:
+        skill_meta_file = COMLINK_DIR / "skill_meta.json"
+        if skill_meta_file.exists() and not _skill_meta_map:
+            data = json.loads(skill_meta_file.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data:
+                _skill_meta_map.update({
+                    _normalize_loc_key(skill_id): _normalize_skill_meta_entry(meta)
+                    for skill_id, meta in data.items()
+                })
+                changed = True
+    except Exception:
+        pass
+    try:
+        skill_ref_file = COMLINK_DIR / "unit_skill_refs.json"
+        if skill_ref_file.exists() and not _unit_skill_reference_map:
+            data = json.loads(skill_ref_file.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data:
+                _unit_skill_reference_map.update(data)
+                changed = True
+    except Exception:
+        pass
+    try:
+        crew_map_file = COMLINK_DIR / "unit_crew_map.json"
+        if crew_map_file.exists() and not _unit_crew_map:
+            data = json.loads(crew_map_file.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data:
+                _unit_crew_map.update(data)
+                changed = True
+    except Exception:
+        pass
+    try:
+        crew_skill_ref_file = COMLINK_DIR / "unit_crew_skill_refs.json"
+        if crew_skill_ref_file.exists() and not _unit_crew_skill_reference_map:
+            data = json.loads(crew_skill_ref_file.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data:
+                _unit_crew_skill_reference_map.update(data)
                 changed = True
     except Exception:
         pass
@@ -7700,14 +7904,21 @@ def _extract_skill_ids(skill_refs, first_only=False):
 
 
 def _skill_row_from_meta(skill_id, raw_tier=0, unlocked=False):
-    meta = _skill_meta_map.get(_normalize_loc_key(skill_id), {})
+    meta = _normalize_skill_meta_entry(_skill_meta_map.get(_normalize_loc_key(skill_id), {}))
     try:
         roster_tier = int(raw_tier)
     except Exception:
         roster_tier = 0
-    level = _skill_level_from_tier(roster_tier)
+    level = _skill_level_from_tier(roster_tier, meta.get("maxTier"))
     zeta_tiers = set(meta.get("zetaTiers") or [])
     omicron_tiers = set(meta.get("omicronTiers") or [])
+    is_zeta_skill = bool(meta.get("isZeta"))
+    is_omicron_skill = bool(meta.get("isOmicron"))
+    # Live roster tiers from Comlink land one step below the cached skillDefinition markers.
+    # Example: a zeta marker at 7 is represented as raw roster tier 6 once unlocked.
+    has_zeta = any((tier_idx - 1) <= roster_tier for tier_idx in zeta_tiers)
+    has_omicron = any((tier_idx - 1) <= roster_tier for tier_idx in omicron_tiers)
+
     return {
         "id": skill_id,
         "skillId": skill_id,
@@ -7716,11 +7927,12 @@ def _skill_row_from_meta(skill_id, raw_tier=0, unlocked=False):
         "level": level,
         "maxTier": int(meta.get("maxTier") or 0),
         "kind": meta.get("kind") or _infer_skill_kind(skill_id),
-        "isZeta": bool(meta.get("isZeta")),
-        "isOmicron": bool(meta.get("isOmicron")),
+        "isZeta": is_zeta_skill,
+        "isOmicron": is_omicron_skill,
         "omicronArea": int(meta.get("omicronArea") or 0),
-        "hasZeta": any(tier_idx <= roster_tier for tier_idx in zeta_tiers),
-        "hasOmicron": any(tier_idx <= roster_tier for tier_idx in omicron_tiers),
+        # Comlink rosterUnit.skill.tier lines up with the tier markers we cache from skillDefinition.
+        "hasZeta": has_zeta,
+        "hasOmicron": has_omicron,
         "unlocked": bool(unlocked),
     }
 
@@ -7799,7 +8011,7 @@ def _populate_gamedata_name_maps(version):
                     zeta_tiers.append(idx)
                 if tier_row.get("isOmicronTier"):
                     omicron_tiers.append(idx)
-            _skill_meta_map[_normalize_loc_key(skill_id)] = {
+            _skill_meta_map[_normalize_loc_key(skill_id)] = _normalize_skill_meta_entry({
                 "maxTier": (len(tier_rows) + 1) if isinstance(tier_rows, list) else 0,
                 "isZeta": bool(skill.get("isZeta")),
                 "isOmicron": bool(skill.get("omicronMode")),
@@ -7807,7 +8019,7 @@ def _populate_gamedata_name_maps(version):
                 "kind": _infer_skill_kind(skill_id),
                 "zetaTiers": zeta_tiers,
                 "omicronTiers": omicron_tiers,
-            }
+            })
 
     for unit in (unit_data.get("units") or []):
         if not isinstance(unit, dict):
@@ -7968,12 +8180,58 @@ def _lookup_ability_name(skill_id, fallback=""):
     return fallback or ""
 
 
-def _skill_level_from_tier(raw_tier):
+def _skill_level_from_tier(raw_tier, max_tier=0):
     try:
         tier = int(raw_tier)
     except Exception:
         return 0
+    try:
+        max_tier = int(max_tier or 0)
+    except Exception:
+        max_tier = 0
+    if max_tier > 0 and max_tier <= 3:
+        if tier <= 0:
+            return 2
+        return min(max_tier, tier + 2)
     return tier + 2 if tier > 0 else 0
+
+
+def _normalize_skill_meta_entry(entry):
+    if not isinstance(entry, dict):
+        entry = {}
+
+    def _clean_tiers(values):
+        cleaned = []
+        seen = set()
+        for value in values or []:
+            try:
+                tier = int(value)
+            except Exception:
+                continue
+            if tier <= 0 or tier in seen:
+                continue
+            seen.add(tier)
+            cleaned.append(tier)
+        return sorted(cleaned)
+
+    zeta_tiers = _clean_tiers(entry.get("zetaTiers"))
+    omicron_tiers = _clean_tiers(entry.get("omicronTiers"))
+    try:
+        omicron_area = int(entry.get("omicronArea") or 0)
+    except Exception:
+        omicron_area = 0
+
+    return {
+        "maxTier": int(entry.get("maxTier") or 0),
+        "isZeta": bool(entry.get("isZeta")) or bool(zeta_tiers),
+        # omicronMode=1 appears on many non-omicron skills in cached live data,
+        # so the actual omicron tier markers are the reliable signal here.
+        "isOmicron": bool(omicron_tiers),
+        "omicronArea": omicron_area if omicron_tiers else 0,
+        "kind": entry.get("kind") or "",
+        "zetaTiers": zeta_tiers,
+        "omicronTiers": omicron_tiers,
+    }
 
 
 def _hydrate_skill_names_in_rosters(rosters):
@@ -8005,6 +8263,7 @@ def _hydrate_skill_names_in_rosters(rosters):
                         current = current_skills[idx] if idx < len(current_skills) and isinstance(current_skills[idx], dict) else {}
                         if (
                             current.get("name") != skill.get("name")
+                            or current.get("level") != skill.get("level")
                             or current.get("maxTier") != skill.get("maxTier")
                             or current.get("hasZeta") != skill.get("hasZeta")
                             or current.get("hasOmicron") != skill.get("hasOmicron")
@@ -8015,6 +8274,15 @@ def _hydrate_skill_names_in_rosters(rosters):
                     unit["skills"] = expanded_skills
                     current_skills = expanded_skills
                     changed = True
+                if current_skills:
+                    zetas = sum(1 for skill in current_skills if isinstance(skill, dict) and skill.get("hasZeta"))
+                    omicrons = sum(1 for skill in current_skills if isinstance(skill, dict) and skill.get("hasOmicron"))
+                    if unit.get("zetas") != zetas:
+                        unit["zetas"] = zetas
+                        changed = True
+                    if unit.get("omicrons") != omicrons:
+                        unit["omicrons"] = omicrons
+                        changed = True
             for skill in current_skills:
                 if not isinstance(skill, dict):
                     continue
@@ -8083,12 +8351,26 @@ def _simplify_skills(unit, def_id="", combat_type=1):
 
     return skills
 
+def _sanitize_persisted_app_state(state):
+    if not isinstance(state, dict):
+        return {}, False
+    sanitized = dict(state)
+    changed = False
+    for key in _VOLATILE_APP_STATE_KEYS:
+        if key in sanitized:
+            sanitized.pop(key, None)
+            changed = True
+    return sanitized, changed
+
 def _load_app_state():
     try:
         if APP_STATE_FILE.exists():
             data = json.loads(APP_STATE_FILE.read_text(encoding="utf-8"))
             if isinstance(data, dict):
+                data, changed = _sanitize_persisted_app_state(data)
                 if _hydrate_skill_names_in_rosters(data.get("guildRosters")):
+                    changed = True
+                if changed:
                     try:
                         APP_STATE_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
                     except Exception:
@@ -8100,6 +8382,7 @@ def _load_app_state():
 
 def _save_app_state(state):
     try:
+        state, _ = _sanitize_persisted_app_state(state)
         APP_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
         APP_STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
         return True
@@ -8764,6 +9047,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": f"Roster fetch failed for '{raw}'"}, 502)
                 return
             _ensure_localization_maps(force=not (_skill_meta_map and _unit_skill_reference_map))
+            statcalc_ready = _apply_roster_power(player)
             roster = player.get("rosterUnit", [])
             simplified = []
             scan_errors = []
@@ -8839,33 +9123,13 @@ class Handler(BaseHTTPRequestHandler):
                     if speed > 0:
                         break
 
-                # ── Zeta / Omicron ─────────────────────────────────────────────────
-                # comlink v4: zeta/omicron via purchasedAbilityId list
-                # Each entry is an ability ID that has been purchased at zeta/omicron tier.
-                # Zeta IDs typically contain "zeta"; omicron IDs contain "omicron".
-                # If neither keyword, count as zeta (older naming convention).
-                purchased = unit.get("purchasedAbilityId") or []
-                zetas = omicrons = 0
-                if ctype == 1 and purchased:  # characters only; ships have no zeta/omicron
-                    for ab_id in purchased:
-                        ab_low = ab_id.lower()
-                        if "omicron" in ab_low:
-                            omicrons += 1
-                        else:
-                            zetas += 1  # zeta or any other purchased upgrade
-
-                # Fallback: check skill tiers (tier 8=omega/zeta, 9=zeta/omicron in some versions)
-                if ctype == 1 and not purchased:
-                    skills = unit.get("skill") or unit.get("skills") or []
-                    for sk in skills:
-                        t = sk.get("tier", 0)
-                        if t >= 9:   omicrons += 1
-                        elif t == 8: zetas    += 1
-
                 if not def_id:
                     scan_errors.append({"issue":"missing_defId","unit_keys":list(unit.keys())[:8]})
                     continue
                 ability_rows = _simplify_skills(unit, def_id=def_id, combat_type=ctype)
+                zetas = sum(1 for row in ability_rows if row.get("hasZeta"))
+                omicrons = sum(1 for row in ability_rows if row.get("hasOmicron"))
+                power = _extract_unit_power(unit)
                 simplified.append({
                     "defId":      def_id,
                     "name":       _lookup_unit_name(
@@ -8878,6 +9142,7 @@ class Handler(BaseHTTPRequestHandler):
                     "combatType": ctype,
                     "modsPresent": mods_present,
                     "speed":      speed,
+                    "power":      power,
                     "zetas":      zetas,
                     "omicrons":   omicrons,
                     "skills":     ability_rows,
@@ -8906,6 +9171,7 @@ class Handler(BaseHTTPRequestHandler):
                         "purchasedAbility":  u0.get("purchasedAbilityId","MISSING"),
                         "currentTier_gear":  u0.get("currentTier","MISSING"),
                         "combatType":        u0.get("combatType","MISSING"),
+                        "power":             _extract_unit_power(u0),
                         "equippedStatMod":   "present" if "equippedStatMod" in u0 else "absent",
                         "nameKey":           u0.get("nameKey","MISSING"),
                         "definitionId":      u0.get("definitionId","MISSING"),
@@ -8913,6 +9179,8 @@ class Handler(BaseHTTPRequestHandler):
                         "high_relic_purchased": hr.get("purchasedAbilityId",[]),
                         "high_relic_skills": str(hr.get("skill",[]))[:400],
                         "high_relic_tier":   _relic_tier(hr),
+                        "statcalc_ready":    statcalc_ready,
+                        "statcalc_error":    _statcalc_last_error,
                     }
                 log_entry = {
                     "allyCode": raw,
@@ -8935,7 +9203,9 @@ class Handler(BaseHTTPRequestHandler):
                 pass  # log failures are non-fatal
 
             self.send_json({"allyCode": raw, "roster": simplified,
-                            "units": len(simplified), "skipped": len(scan_errors)})
+                            "units": len(simplified), "skipped": len(scan_errors),
+                            "powerReady": statcalc_ready,
+                            "powerError": _statcalc_last_error if not statcalc_ready else ""})
 
         elif self.path == "/api/fetch-unit-names":
             # Try multiple sources for a defId→name mapping:
@@ -9170,6 +9440,16 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as _e:
                 pass
             self.send_json({"logged": True})
+
+        elif self.path == "/api/reset-scan-session":
+            try:
+                with _rosters_lock:
+                    _guild_rosters.clear()
+                log_path = COMLINK_DIR / "scan_log.json"
+                log_path.write_text("[]", encoding="utf-8")
+                self.send_json({"reset": True})
+            except Exception as e:
+                self.send_json({"reset": False, "error": str(e)}, 500)
 
         elif self.path == "/api/app-state":
             ok = _save_app_state(payload if isinstance(payload, dict) else {})

@@ -1,4 +1,4 @@
-# SWGOH ROTE Planner
+﻿# SWGOH ROTE Planner
 
 Rise of the Empire Territory Battle planner for Star Wars: Galaxy of Heroes.
 
@@ -15,7 +15,7 @@ Rise of the Empire Territory Battle planner for Star Wars: Galaxy of Heroes.
 
 - Launches a local web app for planning Rise of the Empire Territory Battles
 - Uses `swgoh-comlink` for live guild import and roster scanning
-- Falls back to bundled wiki-based Operations definitions for ROTE platoons
+- Uses bundled wiki-based Operations definitions for ROTE platoons
 - Supports building a standalone Windows `.exe` with PyInstaller
 
 ## Requirements
@@ -32,15 +32,8 @@ python rote_planner.py
 
 ## Build EXE
 
-Install PyInstaller:
-
 ```powershell
 python -m pip install -r requirements.txt
-```
-
-Build the executable:
-
-```powershell
 python -m PyInstaller --onefile --name ROTE_Planner rote_planner.py
 ```
 
@@ -53,11 +46,9 @@ dist\ROTE_Planner.exe
 ## Runtime Notes
 
 - The app downloads `swgoh-comlink` automatically into a local `.comlink` folder on first run.
-- Operations assignments only appear after:
-  1. fetching a guild
-  2. scanning rosters
-  3. running the day-by-day optimizer at least once
-- The app writes startup logs to `rote_planner_startup.log` in the same folder as the executable or script.
+- Operations assignments appear after fetching a guild, scanning rosters, and running the optimizer.
+- Roster scans and generated plan results are treated as session data and are not restored as live data on next launch.
+- The app writes startup logs to `rote_planner_startup.log` beside the executable or script.
 
 ## GitHub Notes
 

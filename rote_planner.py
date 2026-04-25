@@ -403,6 +403,11 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .ops-slot-assignee{font-size:.7rem;color:var(--gold);margin-top:3px}
 .ops-slot-assignee.unassigned{color:var(--text3)}
 .ops-slot-meta{font-size:.64rem;color:var(--text3);line-height:1.45;margin-top:3px}
+.ops-missing-card{margin-top:12px;border:1px dashed rgba(192,57,43,.4);border-radius:var(--radius-lg);padding:.9rem 1rem;background:rgba(192,57,43,.06)}
+.ops-missing-title{font-family:'Orbitron',monospace;font-size:.68rem;letter-spacing:.08em;color:#ffb3ac;text-transform:uppercase;margin-bottom:6px}
+.ops-missing-text{font-size:.74rem;color:var(--text2);line-height:1.5}
+.ops-missing-subtitle{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:#ffb3ac;margin-top:.75rem;margin-bottom:.35rem}
+.ops-missing-line{font-size:.72rem;color:var(--text2);line-height:1.45;padding:2px 0}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 @media(max-width:980px){.ops-layout{grid-template-columns:1fr}}
 @media(max-width:768px){header,.main{padding:1rem}.day-chains-grid{grid-template-columns:1fr}.settings-grid{grid-template-columns:1fr}}
@@ -654,6 +659,26 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
   </div>
   <div id="opt-status-line" style="font-size:.7rem;color:var(--text3);margin-bottom:.75rem;text-align:center">
     Select an algorithm and click Run to generate the optimal TB plan.
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:.85rem">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <select id="export-plan-mode" style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);padding:.35rem .6rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.8rem">
+        <option value="all">One PDF with all days</option>
+        <option value="separate">Separate PDF windows by day</option>
+      </select>
+      <button id="export-plan-pdf-btn" class="btn" onclick="exportCurrentPlanPdf()" disabled>
+        Export Plan PDF
+      </button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <button id="export-plan-snapshot-btn" class="btn" onclick="exportPlannerSnapshot()" disabled>
+        Save Plan Snapshot
+      </button>
+      <label class="btn" style="display:inline-flex;align-items:center;cursor:pointer">
+        Load Plan Snapshot
+        <input type="file" accept=".json" id="plan-snapshot-input" style="display:none" onchange="importPlannerSnapshot(this)">
+      </label>
+    </div>
   </div>
   <div id="day-plan-output"></div>
 </div>
@@ -1280,6 +1305,8 @@ function updateDayPlanUiState(options={}){
   const status = document.getElementById('opt-status-line');
   const sel = document.getElementById('algo-sel');
   const btn = document.getElementById('quick-plan-btn');
+  const exportBtn = document.getElementById('export-plan-pdf-btn');
+  const snapshotBtn = document.getElementById('export-plan-snapshot-btn');
   const warningBtn = document.getElementById('dayplan-warning-btn');
   const warningCard = document.getElementById('dayplan-warning-card');
   const confirmed = !!_optimizerWarningAccepted;
@@ -1292,6 +1319,8 @@ function updateDayPlanUiState(options={}){
   }
   if(sel) sel.disabled = !confirmed || _optRunning;
   if(btn) btn.disabled = !confirmed || !selected || _optRunning;
+  if(exportBtn) exportBtn.disabled = _optRunning || !hasCompletedOptimization();
+  if(snapshotBtn) snapshotBtn.disabled = _optRunning || !hasCompletedOptimization();
   if(_optRunning || !status || preserveStatus) return;
 
   if(!confirmed){
@@ -2926,7 +2955,6 @@ const EXTRA_UNIT_NAMES = {
   ASAJJDARKDISCIPLE:'Asajj Ventress (Dark Disciple)',
   BATCHERS3:'Batcher',
   BAYLANSKOLL:'Baylan Skoll',
-  BLADEOFDORIN:'Blade of Dorin',
   BRUTUS:'Brutus',
   CAPTAINENOCH:'Captain Enoch',
   CAPTAINSILVO:'Captain Silvo',
@@ -3009,6 +3037,7 @@ const SHIP_NAME_BY_DEFID = {
   JEDISTARFIGHTERAHSOKATANO:"Ahsoka Tano's Jedi Starfighter",
   JEDISTARFIGHTERANAKIN:"Anakin's Eta-2 Starfighter",
   JEDISTARFIGHTERCONSULAR:"Jedi Consular's Starfighter",
+  BLADEOFDORIN:"Plo Koon's Jedi Starfighter",
   MARAUDER:'Marauder',
   MG100STARFORTRESSSF17:'MG-100 StarFortress SF-17',
   MILLENNIUMFALCON:"Han's Millennium Falcon",
@@ -3345,6 +3374,7 @@ const UNIT_NAME_ALIASES = {
   'bo-katan mand\'alor': 'MANDALORBOKATAN',
   'bo-katan (mand\'alor)': 'MANDALORBOKATAN',
   'dtmg': 'MOFFGIDEONS3',
+  'blade of dorin': 'BLADEOFDORIN',
 };
 
 const KNOWN_SHIP_DEFIDS = new Set([
@@ -5031,8 +5061,9 @@ function applyDefaultsToPlanner(){
   queueSaveAppState();
 }
 
-function buildAppStateSnapshot(){
-  return {
+function buildAppStateSnapshot(options={}){
+  const includeVolatile = !!options.includeVolatile;
+  const snapshot = {
     version: APP_STATE_VERSION,
     savedAt: new Date().toISOString(),
     primaryAllyCode: _primaryAllyCode,
@@ -5055,6 +5086,16 @@ function buildAppStateSnapshot(){
     activeGuide: _activeGuide,
     expandedGuidePlanets: _expandedPlanets,
   };
+  if(includeVolatile){
+    snapshot.guildSummary = getCurrentGuildSummary();
+    snapshot.guildRosters = normalizeGuildRostersData(guildRosters);
+    snapshot.lastPlanStars = _lastPlanStars;
+    snapshot.lastPlanResult = _lastPlanResult;
+    snapshot.platoonAnalysis = _platoonAnalysis;
+    snapshot.selectedGuideMember = document.getElementById('guide-member-sel')?.value || '';
+    snapshot.selectedRosterMember = document.getElementById('roster-member-sel')?.value || '';
+  }
+  return snapshot;
 }
 
 async function saveAppState(){
@@ -5075,8 +5116,9 @@ function queueSaveAppState(delay=250){
   }, delay);
 }
 
-function applyPersistedAppState(state){
+function applyPersistedAppState(state, options={}){
   if(!state || typeof state !== 'object') return;
+  const allowVolatile = !!options.allowVolatile;
   _appStateHydrating = true;
   try{
     _primaryAllyCode = String(state.primaryAllyCode || '').trim();
@@ -5104,6 +5146,14 @@ function applyPersistedAppState(state){
       for(let i=0;i<6;i++) dailyUndep[i] = Number(state.dailyUndep[i]) || 0;
     }
 
+    if(allowVolatile && state.guildSummary){
+      renderGuildSummary(state.guildSummary, {silent:true, preserveScans:true});
+    }
+    if(allowVolatile){
+      guildRosters = normalizeGuildRostersData(state.guildRosters || {});
+      rebuildUnitNameIndex();
+    }
+
     if(state.guideData) guideData = normalizeGuideData(state.guideData);
     if(state.opsDefinitions) _opsDefinitions = normalizeOperationsDefinitionsData(state.opsDefinitions);
     if(state.pState && typeof state.pState === 'object'){
@@ -5121,9 +5171,13 @@ function applyPersistedAppState(state){
       });
     }
 
-    _platoonAnalysis = {};
-    _lastPlanResult = null;
-    _lastPlanStars = null;
+    _platoonAnalysis = (allowVolatile && state.platoonAnalysis && typeof state.platoonAnalysis === 'object')
+      ? state.platoonAnalysis
+      : {};
+    _lastPlanResult = (allowVolatile && state.lastPlanResult && Array.isArray(state.lastPlanResult.days))
+      ? state.lastPlanResult
+      : null;
+    _lastPlanStars = allowVolatile ? (state.lastPlanStars ?? null) : null;
     _optimizerWarningAccepted = !!state.optimizerWarningAccepted;
     _opsSelectedDay = Math.max(1, Number(state.operationsSelection?.day) || 1);
     _opsSelectedPlanet = String(state.operationsSelection?.planet || '').trim();
@@ -5137,16 +5191,34 @@ function applyPersistedAppState(state){
     renderFalloffViz();
     refreshGuideUnitLinks();
 
+    if(allowVolatile && scannedRosterCount() > 0){
+      renderRosterAnalysis(recountKeyUnits(), scannedRosterCount());
+    }
     populateMemberDropdown();
     initRosterTab();
+
+    if(allowVolatile){
+      const guideSel = document.getElementById('guide-member-sel');
+      if(guideSel && state.selectedGuideMember) guideSel.value = state.selectedGuideMember;
+
+      const rosterSel = document.getElementById('roster-member-sel');
+      if(rosterSel && state.selectedRosterMember){
+        rosterSel.value = state.selectedRosterMember;
+        loadMemberRoster(state.selectedRosterMember);
+      }
+    }
 
     if(document.getElementById('chain-ds').innerHTML) rebuildPlannerChains();
     if(_activeGuide) renderGuideMission(_activeGuide.pid, _activeGuide.mid);
     updateOperationsTabVisibility();
     renderDayPlanGuide();
-    if(document.getElementById('panel-operations')?.classList.contains('active')) initOperationsTab();
+    if(allowVolatile && hasCompletedOptimization()){
+      renderOptPlan(_lastPlanResult, 'loaded', []);
+    } else if(document.getElementById('panel-operations')?.classList.contains('active')){
+      initOperationsTab();
+    }
     calcSummary();
-    updateDayPlanUiState({preserveStatus: false});
+    updateDayPlanUiState({preserveStatus: allowVolatile && hasCompletedOptimization()});
   } finally {
     _appStateHydrating = false;
   }
@@ -6192,6 +6264,356 @@ function renderOptPlan(planResult, algoName, allResults) {
   calcSummary();
 }
 
+function getCurrentPlanForExport(){
+  return hasCompletedOptimization() ? _lastPlanResult : null;
+}
+
+function buildOperationsPlanetExportHtml(planResult, dayNumber, pid){
+  if(!pid || !_opsDefinitions?.[pid]) return '';
+  const planetDef = _opsDefinitions[pid];
+  const planetMeta = getPlanetMetaById(pid) || planetDef;
+  const {dayPlan, opsDay} = getOperationsDayBundle(planResult, dayNumber);
+  const planetToday = opsDay?.planets?.[pid] || null;
+  const memberNameMap = getGuildMemberNameMap();
+  const daysRemaining = countPlanetActiveDaysRemaining(planResult, pid, dayNumber);
+  const summaryInfo = getOperationsPlanetShortfallSummary(planResult, pid, dayNumber);
+  const detailedSnapshots = summaryInfo.snapshots.filter(snapshot=>
+    !snapshot.impossible
+    && (snapshot.completedByDay || snapshot.assignedTodayCount > 0 || snapshot.totalFilled > 0)
+  );
+
+  const platoonCards = detailedSnapshots.map(snapshot=>{
+    const platoon = planetDef.platoons[snapshot.platoonIdx];
+    if(!platoon) return '';
+    const statusClass = snapshot.completedByDay
+      ? 'complete'
+      : snapshot.totalFilled > 0
+        ? 'partial'
+        : 'ready';
+    const statusLabel = snapshot.completedByDay
+      ? (snapshot.completedDay === dayNumber ? 'Completed today' : ('Completed on Day '+snapshot.completedDay))
+      : snapshot.assignedTodayCount > 0
+        ? 'Partial today'
+        : snapshot.totalFilled > 0
+          ? 'Preloaded'
+          : 'Open';
+
+    const slotHtml = snapshot.reqStates.map(entry=>{
+      const req = entry.requirement;
+      return Array.from({length:Number(req?.need) || 0}, (_, slotIdx)=>{
+        const assignment = entry.filledToDay[slotIdx] || null;
+        const assignee = assignment
+          ? ((memberNameMap[String(assignment.allyCode)] || String(assignment.allyCode))
+            + ((Number(assignment?.day) || 0) === Number(dayNumber) ? ' (today)' : (' (Day '+assignment.day+')')))
+          : 'Unassigned';
+        const reqText = getOpsRequirementLabel(req);
+        return '<div class="export-slot-card">'
+          + '<div class="export-slot-name">'+escHtml(req.name)+(((Number(req?.need) || 0) > 1) ? (' '+(slotIdx+1)) : '')+'</div>'
+          + '<div class="export-slot-assignee'+(assignment?'':' unassigned')+'">- '+escHtml(assignee)+'</div>'
+          + '<div class="export-slot-meta">Players available: '+entry.availableCount+' | Requirement: '+escHtml(reqText)+'</div>'
+          + '</div>';
+      }).join('');
+    }).join('');
+
+    return '<div class="export-platoon-card '+statusClass+'">'
+      + '<div class="export-platoon-head">'
+      + '<div><div class="export-platoon-title">Platoon '+platoon.id+'</div>'
+      + '<div class="export-platoon-sub">'+snapshot.totalFilled+'/'+snapshot.totalSlots+' slots filled</div></div>'
+      + '<div class="export-platoon-badge '+statusClass+'">'+escHtml(statusLabel)+'</div>'
+      + '</div>'
+      + '<div class="export-slot-list">'+slotHtml+'</div>'
+      + '</div>';
+  }).filter(Boolean);
+  const leftColumn = platoonCards.slice(0, 3).join('');
+  const rightColumn = platoonCards.slice(3).join('');
+  const missingSummaryHtml = buildOpsMissingSummaryHtml(planResult, pid, dayNumber, 'export');
+  const detailHtml = platoonCards.length
+    ? ('<div class="export-platoon-columns">'
+      + '<div class="export-platoon-column">'+leftColumn+'</div>'
+      + '<div class="export-platoon-column">'+rightColumn+'</div>'
+      + '</div>')
+    : '<div class="export-empty">No platoons were completed or partially filled for this planet by this day.</div>';
+
+  return '<section class="export-planet-section">'
+    + '<div class="export-planet-head">'
+    + '<div><div class="export-planet-title">'+escHtml(planetMeta?.name || pid)+'</div>'
+    + '<div class="export-planet-sub">'+escHtml(getPlanetLabelForSelectedDay(dayPlan, pid))
+    + ' | Zone '+(planetMeta?.zone || '?')
+    + ' | '+daysRemaining+' day'+(daysRemaining===1?'':'s')+' remaining active</div></div>'
+    + '<div class="export-planet-metrics">'
+    + '<div>Today: '+(planetToday ? ((planetToday.slotsFilled || 0)+' slots | '+fmtM(planetToday.pointsEarned || 0)) : 'No new slots')+'</div>'
+    + '<div>Completed today: '+(planetToday?.completedToday || 0)+'</div>'
+    + '</div></div>'
+    + detailHtml
+    + missingSummaryHtml
+    + '</section>';
+}
+
+function buildPlanExportDocumentHtml(planResult, options={}){
+  const requestedDays = Array.isArray(options.dayNumbers) && options.dayNumbers.length
+    ? new Set(options.dayNumbers.map(day=>Number(day) || 0).filter(Boolean))
+    : null;
+  const docTitle = String(options.docTitle || 'ROTE Plan Export');
+  const autoPrint = !!options.autoPrint;
+  const summary = getCurrentGuildSummary();
+  const guildName = summary?.name || document.getElementById('guild-name-display')?.dataset?.guildName || 'Current Guild';
+  const generatedAt = new Date().toLocaleString();
+  const totalStars = Number(planResult?.totalStars || 0);
+  const opsSummary = planResult?.opsSummary || {};
+  const bonusCount = getActiveBonusPlanetIdsFromPlanDays(planResult?.days || []).size;
+  const chainNames = {ds:'Dark Side', mx:'Mixed', ls:'Light Side'};
+
+  const daySections = (planResult?.days || []).filter(dayPlan=>
+    !requestedDays || requestedDays.has(Number(dayPlan?.day || 0))
+  ).map(dayPlan=>{
+    const cards = buildDayPlanCardsHtml(dayPlan, chainNames);
+    let notesHtml = (dayPlan?.notices || []).map(note=>'<div class="export-note">'+escHtml(note)+'</div>').join('');
+    const opsDay = (planResult?.opsSummary?.days || []).find(entry=>Number(entry?.day || 0) === Number(dayPlan?.day || 0)) || null;
+    if(dayPlan?.opsPoints || Object.values(dayPlan?.opsPlanets || {}).some(planet=>planet.slotsFilled > 0)){
+      const opsLines = Object.entries(dayPlan?.opsPlanets || {})
+        .filter(([,planet])=>planet.completedToday > 0 || planet.slotsFilled > 0)
+        .sort((a,b)=>(b[1].priority - a[1].priority) || a[0].localeCompare(b[0]))
+        .map(([pid, planet])=>{
+          const meta = getPlanetMetaById(pid);
+          return '<div class="export-note"><strong>'+escHtml(meta?.name || pid)+'</strong>: '
+            + planet.slotsFilled + ' slots'
+            + (planet.completedToday ? (' | '+planet.completedToday+' platoon'+(planet.completedToday===1?'':'s')+' completed') : '')
+            + '</div>';
+        }).join('');
+      notesHtml += '<div class="export-note"><strong>Operations</strong>: '
+        + (dayPlan.opsPoints ? ('+'+fmtM(dayPlan.opsPoints)) : 'preloading only') + '</div>' + opsLines;
+    }
+
+    const activePlanetIds = getActivePlanetIdsForPlanDay(dayPlan);
+    const opsSections = activePlanetIds.length
+      ? activePlanetIds.map(pid=>buildOperationsPlanetExportHtml(planResult, dayPlan.day, pid)).join('')
+      : '<div class="export-empty">No active planets were planned for operations on this day.</div>';
+
+    return '<section class="export-day-section">'
+      + '<div class="export-day-header">'
+      + '<div><div class="export-day-title">Day '+dayPlan.day+'</div>'
+      + '<div class="export-day-sub">Available GP: '+fmtM(dayPlan.gpAvail)+' | Used GP: '+fmtM(dayPlan.gpUsed)+'</div></div>'
+      + '<div class="export-day-stars">'+dayPlan.starsDay+' stars</div>'
+      + '</div>'
+      + '<div class="export-subtitle">Day Plan</div>'
+      + '<div class="export-day-grid">'+cards+'</div>'
+      + (notesHtml ? ('<div class="export-note-block">'+notesHtml+'</div>') : '')
+      + '<div class="export-subtitle" style="margin-top:18px">Operations</div>'
+      + '<div class="export-ops-summary">Ops points today: '+fmtM(opsDay?.pointsEarned || 0)
+      + ' | Slots planned: '+Object.values(opsDay?.planets || {}).reduce((sum, planet)=>sum + (Number(planet?.slotsFilled) || 0), 0)
+      + ' | Platoons completed today: '+Object.values(opsDay?.planets || {}).reduce((sum, planet)=>sum + (Number(planet?.completedToday) || 0), 0)
+      + '</div>'
+      + opsSections
+      + '</section>';
+  }).join('');
+
+  return '<!doctype html><html><head><meta charset="utf-8"><title>'+escHtml(docTitle)+'</title>'
+    + '<style>'
+    + '@page{size:auto;margin:.45in;}'
+    + 'html,body{margin:0;padding:0;background:#f4f6fb;color:#142033;font-family:Segoe UI,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    + 'body{padding:18px 20px 26px;}'
+    + '.export-header{border:1px solid #d7deed;border-radius:14px;background:#fff;padding:18px 20px;margin-bottom:18px;}'
+    + '.export-title{font:700 24px Orbitron,Segoe UI,Arial,sans-serif;color:#cc9e22;letter-spacing:.04em;margin-bottom:6px;}'
+    + '.export-subhead{font-size:13px;color:#5f6f8f;line-height:1.5;}'
+    + '.export-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px;}'
+    + '.export-metric{border:1px solid #d7deed;border-radius:12px;padding:10px 12px;background:#fafcff;}'
+    + '.export-metric-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6f7f9c;margin-bottom:5px;}'
+    + '.export-metric-value{font:700 20px Orbitron,Segoe UI,Arial,sans-serif;color:#142033;}'
+    + '.export-day-section{page-break-before:always;break-before:page;padding-top:4px;}'
+    + '.export-day-section:first-of-type{page-break-before:auto;break-before:auto;}'
+    + '.export-day-header{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin-bottom:14px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,#1b2640 0%,#28395c 100%);border:1px solid #203152;}'
+    + '.export-day-title{font:700 24px Orbitron,Segoe UI,Arial,sans-serif;color:#f4c64d;}'
+    + '.export-day-sub{font-size:12px;color:#d6def1;margin-top:5px;}'
+    + '.export-day-stars{font:700 22px Orbitron,Segoe UI,Arial,sans-serif;color:#f4c64d;white-space:nowrap;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);}'
+    + '.export-subtitle{font:700 13px Orbitron,Segoe UI,Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#6f7f9c;margin-bottom:10px;}'
+    + '.export-day-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}'
+    + '.day-chain{border:1px solid #d7deed;border-radius:14px;background:#ffffff;padding:14px;min-height:118px;box-sizing:border-box;}'
+    + '.day-chain.ds{border-left:6px solid #cc5b5b;}.day-chain.mx{border-left:6px solid #3ea87a;}.day-chain.ls{border-left:6px solid #4685d9;}.day-chain.bonus{border-left:6px solid #9b6bd3;}'
+    + '.day-chain-title{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#73829d;margin-bottom:8px;font-family:Orbitron,Segoe UI,Arial,sans-serif;}'
+    + '.day-planet-name{font:700 16px Rajdhani,Segoe UI,Arial,sans-serif;color:#142033;margin-bottom:6px;}'
+    + '.day-stars{font:700 18px Orbitron,Segoe UI,Arial,sans-serif;color:#cc9e22;margin-bottom:5px;}'
+    + '.day-action{font-size:13px;color:#22324c;margin-bottom:4px;font-weight:600;}'
+    + '.day-advance{font-size:12px;color:#62718f;line-height:1.45;}'
+    + '.export-note-block{border:1px solid #d7deed;border-radius:12px;background:#fff;padding:10px 12px;margin-top:12px;}'
+    + '.export-note{font-size:12px;color:#4c5d7b;line-height:1.5;margin:4px 0;}'
+    + '.export-ops-summary{font-size:12px;color:#4c5d7b;margin-bottom:12px;}'
+    + '.export-planet-section{border:1px solid #d7deed;border-radius:14px;background:#fff;padding:14px 14px 12px;margin-bottom:14px;}'
+    + '.export-planet-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px;}'
+    + '.export-planet-title{font:700 18px Rajdhani,Segoe UI,Arial,sans-serif;color:#142033;}'
+    + '.export-planet-sub{font-size:12px;color:#62718f;line-height:1.45;margin-top:3px;}'
+    + '.export-planet-metrics{font-size:12px;color:#4c5d7b;line-height:1.45;text-align:right;white-space:nowrap;}'
+    + '.export-platoon-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;}'
+    + '.export-platoon-column{display:flex;flex-direction:column;gap:12px;}'
+    + '.export-platoon-card{border:1px solid #d7deed;border-left:6px solid #9aa7c0;border-radius:12px;padding:12px;background:#fbfcff;}'
+    + '.export-platoon-card.complete{border-left-color:#27ae60;}.export-platoon-card.partial{border-left-color:#2980b9;}.export-platoon-card.impossible{border-left-color:#c0392b;}.export-platoon-card.ready{border-left-color:#8c98b3;}'
+    + '.export-platoon-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;}'
+    + '.export-platoon-title{font:700 14px Orbitron,Segoe UI,Arial,sans-serif;color:#142033;}'
+    + '.export-platoon-sub{font-size:11px;color:#73829d;margin-top:2px;}'
+    + '.export-platoon-badge{font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px;border:1px solid #d7deed;color:#4c5d7b;background:#fff;white-space:nowrap;}'
+    + '.export-platoon-badge.complete{color:#1f8a53;border-color:#9cddbb;background:#f2fcf6;}.export-platoon-badge.partial{color:#216aaf;border-color:#a6ccef;background:#f3f8fe;}.export-platoon-badge.impossible{color:#b1312f;border-color:#efb2af;background:#fff5f5;}'
+    + '.export-slot-list{display:grid;grid-template-columns:1fr;gap:8px;}'
+    + '.export-slot-card{border:1px solid #e1e7f2;border-radius:10px;padding:8px 10px;background:#fff;}'
+    + '.export-slot-name{font:700 13px Rajdhani,Segoe UI,Arial,sans-serif;color:#142033;}'
+    + '.export-slot-assignee{font-size:12px;color:#22324c;margin-top:2px;}.export-slot-assignee.unassigned{color:#9b5a5a;}'
+    + '.export-slot-meta{font-size:11px;color:#73829d;margin-top:3px;line-height:1.4;}'
+    + '.export-missing-card{margin-top:12px;border:1px dashed #e7b4b2;border-radius:12px;padding:10px 12px;background:#fff6f6;}'
+    + '.export-missing-title{font:700 12px Orbitron,Segoe UI,Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9b4542;margin-bottom:6px;}'
+    + '.export-missing-text{font-size:12px;color:#6a4a4a;line-height:1.5;}'
+    + '.export-missing-subtitle{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9b4542;margin-top:10px;margin-bottom:4px;}'
+    + '.export-missing-line{font-size:12px;color:#6a4a4a;line-height:1.45;padding:2px 0;}'
+    + '.export-empty{border:1px dashed #c7d0e1;border-radius:12px;padding:14px;color:#73829d;background:#fff;font-size:12px;}'
+    + '@media print{body{padding:0;}.export-header{break-inside:avoid;}.export-planet-section,.export-note-block,.day-chain,.export-platoon-card,.export-missing-card{break-inside:avoid;}}'
+    + '</style></head><body>'
+    + '<section class="export-header">'
+    + '<div class="export-title">'+escHtml(docTitle)+'</div>'
+    + '<div class="export-subhead"><strong>'+escHtml(guildName)+'</strong><br>Generated '+escHtml(generatedAt)+'<br>Use your browser\'s <strong>Save as PDF</strong> destination to share this document.</div>'
+    + '<div class="export-metrics">'
+    + '<div class="export-metric"><div class="export-metric-label">Total Est. Stars</div><div class="export-metric-value">'+totalStars+'</div></div>'
+    + '<div class="export-metric"><div class="export-metric-label">Ops Filled</div><div class="export-metric-value">'+(opsSummary.totalCompleted || 0)+'/'+(opsSummary.totalPlatoons || 0)+'</div></div>'
+    + '<div class="export-metric"><div class="export-metric-label">Ops Points</div><div class="export-metric-value">'+fmtM(opsSummary.totalPoints || 0)+'</div></div>'
+    + '<div class="export-metric"><div class="export-metric-label">Bonus Planets</div><div class="export-metric-value">'+bonusCount+'/2</div></div>'
+    + '</div></section>'
+    + daySections
+    + (autoPrint
+        ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.focus();window.print();}catch(err){}},320);});<\/script>'
+        : '')
+    + '</body></html>';
+}
+
+function triggerPrintExportDocument(docHtml){
+  const printWin = window.open('', '_blank');
+  if(!printWin) return false;
+  printWin.document.open();
+  printWin.document.write(docHtml);
+  printWin.document.close();
+  setTimeout(()=>{
+    try{
+      printWin.focus();
+      printWin.print();
+    }catch(err){}
+  }, 300);
+  return true;
+}
+
+function openSeparatePlanExportHub(planResult){
+  const days = Array.isArray(planResult?.days) ? planResult.days : [];
+  if(!days.length) return false;
+  const hubWin = window.open('', '_blank');
+  if(!hubWin) return false;
+  const dayEntries = days.map(dayPlan=>{
+    const dayNumber = Number(dayPlan?.day || 0);
+    const html = buildPlanExportDocumentHtml(planResult, {
+      dayNumbers: [dayNumber],
+      docTitle: 'Rise of the Empire - Day '+dayNumber+' Export',
+      autoPrint: true
+    });
+    const blob = new Blob([html], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    return {dayNumber, url};
+  });
+  const cards = dayEntries.map(entry=>
+    '<button type="button" class="export-hub-btn" onclick="window.open(\''+entry.url+'\', \'_blank\')">'
+    + 'Open Day '+entry.dayNumber+' print view'
+    + '</button>'
+  ).join('');
+  hubWin.document.open();
+  hubWin.document.write('<!doctype html><html><head><meta charset="utf-8"><title>ROTE Separate Day Exports</title>'
+    + '<style>'
+    + 'body{margin:0;padding:24px;background:#0b1220;color:#e8eaf0;font-family:Segoe UI,Arial,sans-serif;}'
+    + '.wrap{max-width:720px;margin:0 auto;}'
+    + '.title{font:700 24px Orbitron,Segoe UI,Arial,sans-serif;color:#f0c040;margin-bottom:8px;}'
+    + '.sub{font-size:14px;line-height:1.6;color:#a9b4c8;margin-bottom:18px;}'
+    + '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;}'
+    + '.export-hub-btn{width:100%;padding:14px 16px;border-radius:12px;border:1px solid rgba(240,192,64,.3);background:#162033;color:#f0c040;font:600 14px Segoe UI,Arial,sans-serif;cursor:pointer;}'
+    + '.export-hub-btn:hover{background:#1b2942;}'
+    + '.note{margin-top:18px;font-size:13px;color:#7f8da8;line-height:1.55;}'
+    + '</style></head><body><div class="wrap">'
+    + '<div class="title">Separate Day Exports</div>'
+    + '<div class="sub">Browsers usually block multiple print windows from one click. Use the buttons below to open each day as its own printable document.</div>'
+    + '<div class="grid">'+cards+'</div>'
+    + '<div class="note">Each day opens in its own window and triggers the print dialog automatically. Choose <strong>Save as PDF</strong> in each print dialog.</div>'
+    + '</div></body></html>');
+  hubWin.document.close();
+  return true;
+}
+
+function exportCurrentPlanPdf(){
+  const planResult = getCurrentPlanForExport();
+  if(!planResult){
+    showImportStatus('Run the optimizer first to export a day-by-day plan PDF.', 'err');
+    updateDayPlanUiState();
+    return;
+  }
+  const mode = String(document.getElementById('export-plan-mode')?.value || 'all');
+  if(mode === 'separate'){
+    const ok = openSeparatePlanExportHub(planResult);
+    if(!ok){
+      showImportStatus('The separate-day export window was blocked. Please allow pop-ups for the planner and try again.', 'err');
+      return;
+    }
+    showImportStatus('Opened the separate-day export helper. Use each day button to open and save its PDF.', 'ok');
+    return;
+  }
+  const ok = triggerPrintExportDocument(buildPlanExportDocumentHtml(planResult, {
+    docTitle: 'Rise of the Empire - Full Plan Export'
+  }));
+  if(!ok){
+    showImportStatus('The export window was blocked. Please allow pop-ups for the planner and try again.', 'err');
+    return;
+  }
+  showImportStatus('Export opened. Choose Save as PDF in the print dialog to share the full plan.', 'ok');
+}
+
+function downloadJsonFile(data, filename){
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportPlannerSnapshot(){
+  const planResult = getCurrentPlanForExport();
+  if(!planResult){
+    showImportStatus('Run the optimizer first to save a full planning snapshot.', 'err');
+    updateDayPlanUiState();
+    return;
+  }
+  const stamp = new Date().toISOString().replace(/[:]/g,'-').replace(/\..+/,'');
+  downloadJsonFile(buildAppStateSnapshot({includeVolatile:true}), 'rote-plan-snapshot-'+stamp+'.json');
+  showImportStatus('Planning snapshot saved. This file can restore the exact guild, rosters, plan, and operations later.', 'ok');
+}
+
+async function importPlannerSnapshot(input){
+  const file = input.files?.[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async e=>{
+    try{
+      const state = JSON.parse(e.target.result);
+      if(!state || typeof state !== 'object') throw new Error('Invalid snapshot format');
+      if(!state.guildRosters || !state.lastPlanResult) throw new Error('Snapshot is missing roster or plan data');
+      const resp = await fetch('/api/import-session-state', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({guildRosters: normalizeGuildRostersData(state.guildRosters || {})})
+      });
+      const data = await resp.json();
+      if(data?.error) throw new Error(data.error);
+      applyPersistedAppState(state, {allowVolatile:true});
+      queueSaveAppState();
+      showImportStatus('Snapshot loaded — restored guild, rosters, day plan, and operations from '+file.name, 'ok');
+    }catch(err){
+      alert('Failed to load planning snapshot: '+err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
 // ── Rule-based plan (fast) ────────────────────────────────────────
 function generateDayPlan() {
   const out = document.getElementById('day-plan-output');
@@ -6502,6 +6924,118 @@ function getRequirementAvailabilityCount(pid, platoonIdx, requirement){
   return owners.size;
 }
 
+function getOpsRequirementLabel(requirement){
+  const rarity = (Number(requirement?.minRarity) || 7) + '★';
+  const combatType = Number(requirement?.combatType) || inferUnitCombatType({defId:requirement?.defId});
+  return combatType === 2
+    ? (rarity + ' ship')
+    : (rarity + ' | R' + (Number(requirement?.minRelic) || 0) + '+');
+}
+
+function getOpsRequirementShortfallKey(requirement){
+  return [
+    normalizeDefId(requirement?.defId).toUpperCase(),
+    Number(requirement?.minRarity) || 7,
+    Number(requirement?.combatType) || inferUnitCombatType({defId:requirement?.defId}),
+    Number(requirement?.minRelic) || 0
+  ].join('|');
+}
+
+function summarizeOpsRequirementShortfalls(entries){
+  const grouped = {};
+  (entries || []).forEach(entry=>{
+    const requirement = entry?.requirement || entry;
+    const needed = Number(entry?.needed != null ? entry.needed : entry?.remaining) || 0;
+    const availableCount = Number(entry?.availableCount) || 0;
+    if(!requirement || needed <= 0) return;
+    const key = getOpsRequirementShortfallKey(requirement);
+    if(!grouped[key]){
+      grouped[key] = {
+        key,
+        requirement,
+        needed: 0,
+        availableCount,
+        missing: 0
+      };
+    }
+    grouped[key].needed += needed;
+    grouped[key].availableCount = Math.max(grouped[key].availableCount, availableCount);
+  });
+  return Object.values(grouped)
+    .map(item=>({
+      ...item,
+      missing: Math.max(0, item.needed - item.availableCount)
+    }))
+    .filter(item=>item.missing > 0)
+    .sort((a,b)=>
+      (b.missing - a.missing)
+      || defIdToName(a.requirement?.defId, a.requirement?.name).localeCompare(defIdToName(b.requirement?.defId, b.requirement?.name))
+    );
+}
+
+function formatOpsShortfallText(item){
+  const name = defIdToName(item?.requirement?.defId, item?.requirement?.name);
+  return name + ' x' + (Number(item?.missing) || 0) + ' (' + getOpsRequirementLabel(item?.requirement) + ')';
+}
+
+function getOperationsPlanetShortfallSummary(planResult, pid, dayNumber){
+  const planetDef = _opsDefinitions?.[pid];
+  if(!planetDef) return {snapshots:[], planetShortfalls:[], impossiblePlatoons:[]};
+  const snapshots = (planetDef.platoons || []).map((platoon, platoonIdx)=>{
+    const snapshot = buildOperationsPlatoonSnapshot(planResult, pid, platoonIdx, dayNumber);
+    return snapshot ? {
+      ...snapshot,
+      platoonIdx,
+      platoonId: platoon.id
+    } : null;
+  }).filter(Boolean);
+  const remainingEntries = snapshots
+    .filter(snapshot=>!snapshot.completedByDay)
+    .flatMap(snapshot=>snapshot.reqStates.map(entry=>({
+      requirement: entry.requirement,
+      availableCount: entry.availableCount,
+      needed: entry.remaining
+    })));
+  const planetShortfalls = summarizeOpsRequirementShortfalls(remainingEntries);
+  const impossiblePlatoons = snapshots
+    .filter(snapshot=>snapshot.impossible)
+    .map(snapshot=>({
+      platoonIdx: snapshot.platoonIdx,
+      platoonId: snapshot.platoonId,
+      totalFilled: snapshot.totalFilled,
+      totalSlots: snapshot.totalSlots,
+      shortfalls: summarizeOpsRequirementShortfalls(snapshot.reqStates.map(entry=>({
+        requirement: entry.requirement,
+        availableCount: entry.availableCount,
+        needed: entry.remaining
+      })))
+    }))
+    .filter(entry=>entry.shortfalls.length);
+  return {snapshots, planetShortfalls, impossiblePlatoons};
+}
+
+function buildOpsMissingSummaryHtml(planResult, pid, dayNumber, classPrefix='ops'){
+  const summary = getOperationsPlanetShortfallSummary(planResult, pid, dayNumber);
+  if(!summary.planetShortfalls.length && !summary.impossiblePlatoons.length) return '';
+  const planetLine = summary.planetShortfalls.length
+    ? summary.planetShortfalls.map(item=>escHtml(formatOpsShortfallText(item))).join(' · ')
+    : 'None';
+  const impossibleLines = summary.impossiblePlatoons.length
+    ? summary.impossiblePlatoons.map(entry=>
+        '<div class="'+classPrefix+'-missing-line"><strong>Platoon '+entry.platoonId+'</strong>: '
+        + entry.shortfalls.map(item=>escHtml(formatOpsShortfallText(item))).join(' · ')
+        + '</div>'
+      ).join('')
+    : '<div class="'+classPrefix+'-missing-line">No impossible platoons on this planet by this day.</div>';
+  return '<div class="'+classPrefix+'-missing-card">'
+    + '<div class="'+classPrefix+'-missing-title">Missing units summary</div>'
+    + '<div class="'+classPrefix+'-missing-text">To complete all remaining platoons on this planet in one day, the guild is still short: '
+    + planetLine + '</div>'
+    + '<div class="'+classPrefix+'-missing-subtitle">Impossible platoon blockers</div>'
+    + impossibleLines
+    + '</div>';
+}
+
 function buildOperationsPlatoonSnapshot(planResult, pid, platoonIdx, dayNumber){
   const planetDef = _opsDefinitions?.[pid];
   const platoonDef = planetDef?.platoons?.[platoonIdx];
@@ -6645,8 +7179,7 @@ function buildOperationsPlatoonDetailHtml(planResult, dayNumber, pid){
           ? ('- ' + (memberNameMap[String(assignment.allyCode)] || String(assignment.allyCode))
             + ((Number(assignment?.day) || 0) === Number(dayNumber) ? ' (today)' : (' (Day '+assignment.day+')')))
           : '- Unassigned';
-        const reqText = (Number(req?.minRarity) || 7) + '★'
-          + ((Number(req?.combatType) || 1) === 2 ? ' ship' : (' | R'+(Number(req?.minRelic) || 0)+'+'));
+        const reqText = getOpsRequirementLabel(req);
         return '<div class="ops-slot-card">'
           + '<div class="ops-slot-name">'+escHtml(req.name)+(((Number(req?.need) || 0) > 1) ? (' '+(slotIdx+1)) : '')+'</div>'
           + '<div class="ops-slot-assignee'+(assignment?'':' unassigned')+'">'+escHtml(assignee)+'</div>'
@@ -6664,6 +7197,7 @@ function buildOperationsPlatoonDetailHtml(planResult, dayNumber, pid){
       + '<div class="ops-slot-list">'+slotHtml+'</div>'
       + '</div>';
   }).join('');
+  const missingSummaryHtml = buildOpsMissingSummaryHtml(planResult, pid, dayNumber, 'ops');
 
   return '<div class="ops-stage-card">'
     + '<div class="ops-stage-head">'
@@ -6678,6 +7212,7 @@ function buildOperationsPlatoonDetailHtml(planResult, dayNumber, pid){
     + 'Zone '+(planetMeta?.zone || '?')+' requirements'
     + '</div></div>'
     + '<div class="ops-platoon-grid">'+(platoonHtml || '<div class="ops-empty">No platoons are available for this planet.</div>')+'</div>'
+    + missingSummaryHtml
     + '</div>';
 }
 
@@ -7268,7 +7803,6 @@ _EXTRA_UNIT_NAME_MAP = {
     "ASAJJDARKDISCIPLE":"Asajj Ventress (Dark Disciple)",
     "BATCHERS3":"Batcher",
     "BAYLANSKOLL":"Baylan Skoll",
-    "BLADEOFDORIN":"Blade of Dorin",
     "BRUTUS":"Brutus",
     "CAPTAINENOCH":"Captain Enoch",
     "CAPTAINSILVO":"Captain Silvo",
@@ -7351,6 +7885,7 @@ _SHIP_NAME_MAP = {
     "JEDISTARFIGHTERAHSOKATANO":"Ahsoka Tano's Jedi Starfighter",
     "JEDISTARFIGHTERANAKIN":"Anakin's Eta-2 Starfighter",
     "JEDISTARFIGHTERCONSULAR":"Jedi Consular's Starfighter",
+    "BLADEOFDORIN":"Plo Koon's Jedi Starfighter",
     "MARAUDER":"Marauder",
     "MG100STARFORTRESSSF17":"MG-100 StarFortress SF-17",
     "MILLENNIUMFALCON":"Han's Millennium Falcon",
@@ -9450,6 +9985,29 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"reset": True})
             except Exception as e:
                 self.send_json({"reset": False, "error": str(e)}, 500)
+
+        elif self.path == "/api/import-session-state":
+            rosters = payload.get("guildRosters") or {}
+            if not isinstance(rosters, dict):
+                self.send_json({"error": "guildRosters must be an object"}, 400)
+                return
+            normalized = {}
+            total_units = 0
+            for ally_code, roster in rosters.items():
+                ally_code = str(ally_code or "").strip()
+                if not ally_code:
+                    continue
+                clean_roster = roster if isinstance(roster, list) else []
+                normalized[ally_code] = clean_roster
+                total_units += len(clean_roster)
+            with _rosters_lock:
+                _guild_rosters.clear()
+                _guild_rosters.update(normalized)
+            self.send_json({
+                "imported": True,
+                "members": len(normalized),
+                "units": total_units,
+            })
 
         elif self.path == "/api/app-state":
             ok = _save_app_state(payload if isinstance(payload, dict) else {})

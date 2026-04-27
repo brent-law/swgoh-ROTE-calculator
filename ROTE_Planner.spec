@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['rote_planner.py'],
+    ['C:\\Users\\brent\\Documents\\New project\\release_exe_2026-04-27_ops-stable-wiki-source\\rote_planner.py'],
     pathex=[],
     binaries=[],
     datas=[],

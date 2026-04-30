@@ -156,7 +156,7 @@ HTML_APP = r"""<!DOCTYPE html>
   --ls:#2980b9;--ls-dim:#0d2e4a;--ls-glow:rgba(41,128,185,0.15);
   --bonus:#8e44ad;--bonus-dim:#3b1a5e;--bonus-glow:rgba(142,68,173,0.15);
   --gold:#f0c040;--gold2:#c8a020;--silver:#a0aab4;
-  --text:#e8eaf0;--text2:#8090a8;--text3:#4a5568;
+  --text:#e8eaf0;--text2:#c4d2e5;--text3:#a8bbd3;
   --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
   --radius:8px;--radius-lg:14px;
 }
@@ -170,40 +170,101 @@ body::before{content:'';position:fixed;inset:0;background:
   pointer-events:none;z-index:0}
 header{position:relative;z-index:2;padding:1.5rem 2rem 0;border-bottom:1px solid var(--border2)}
 h1{font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:700;letter-spacing:.12em;color:var(--gold);text-shadow:0 0 24px rgba(240,192,64,.35)}
-.subtitle{font-size:.8rem;color:var(--text2);letter-spacing:.05em;margin-top:3px}
+.subtitle{font-size:.84rem;color:var(--text2);letter-spacing:.05em;margin-top:3px}
 .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--text3)}
 .status-dot.online{background:var(--mx)}
 .status-dot.offline{background:var(--ds)}
 .nav-tabs{display:flex;gap:0;margin-top:1.25rem}
-.nav-tab{font-family:'Rajdhani',sans-serif;font-size:.78rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:.5rem 1.25rem;border:1px solid var(--border2);border-bottom:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .2s;border-radius:var(--radius) var(--radius) 0 0}
+.nav-tab{font-family:'Rajdhani',sans-serif;font-size:.82rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:.5rem 1.25rem;border:1px solid var(--border2);border-bottom:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .2s;border-radius:var(--radius) var(--radius) 0 0}
 .nav-tab[hidden]{display:none !important}
 .nav-tab:hover{color:var(--text);background:rgba(255,255,255,.03)}
 .nav-tab.active{background:var(--bg3);color:var(--gold);border-color:rgba(240,192,64,.4);border-bottom-color:var(--bg3)}
 .main{position:relative;z-index:1;padding:1.5rem 2rem}
 .panel{display:none}.panel.active{display:block}
 .card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
-.card-title{font-family:'Orbitron',monospace;font-size:.68rem;letter-spacing:.12em;color:var(--text2);text-transform:uppercase;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.card-title{font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.12em;color:var(--text2);text-transform:uppercase;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
 .card-title::after{content:'';flex:1;height:1px;background:var(--border)}
 .field{margin-bottom:.75rem}
-.field label{display:block;font-size:.75rem;color:var(--text2);letter-spacing:.04em;margin-bottom:4px}
+.field label{display:block;font-size:.78rem;color:var(--text2);letter-spacing:.04em;margin-bottom:4px}
 .field input,.field select,.field textarea{width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);padding:.45rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.9rem;outline:none;transition:border-color .2s}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:rgba(240,192,64,.5)}
-.field small{display:block;font-size:.68rem;color:var(--text3);margin-top:3px}
+.field small{display:block;font-size:.72rem;color:var(--text3);margin-top:3px}
 .field textarea{resize:vertical;min-height:70px;font-size:.78rem;line-height:1.4}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-.btn{font-family:'Orbitron',monospace;font-size:.68rem;letter-spacing:.1em;padding:.55rem 1.25rem;border:1px solid var(--border2);background:transparent;color:var(--text2);border-radius:var(--radius);cursor:pointer;transition:all .2s}
+.btn{font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.1em;padding:.55rem 1.25rem;border:1px solid var(--border2);background:transparent;color:var(--text2);border-radius:var(--radius);cursor:pointer;transition:all .2s}
 .btn:hover{border-color:var(--text2);color:var(--text)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-gold{border-color:var(--gold2);color:var(--gold)}
 .btn-gold:hover:not(:disabled){background:var(--gold);color:var(--bg);border-color:var(--gold)}
+.btn-scan-loud{
+  position:relative;
+  border-color:#36f3a2;
+  color:#ecfff6;
+  background:linear-gradient(135deg,rgba(18,122,76,.95),rgba(30,186,116,.98));
+  box-shadow:0 0 0 1px rgba(54,243,162,.24),0 0 18px rgba(54,243,162,.42),0 0 38px rgba(54,243,162,.22);
+  text-shadow:0 0 10px rgba(255,255,255,.18);
+  animation:scanPulse 1.8s ease-in-out infinite;
+}
+.btn-scan-loud:hover:not(:disabled){
+  color:#ffffff;
+  border-color:#8cffca;
+  background:linear-gradient(135deg,rgba(23,145,92,1),rgba(43,221,141,1));
+  box-shadow:0 0 0 1px rgba(140,255,202,.34),0 0 22px rgba(54,243,162,.55),0 0 48px rgba(54,243,162,.28);
+  transform:translateY(-1px) scale(1.01);
+}
+.btn-scan-loud:disabled{
+  animation:none;
+  box-shadow:none;
+}
+@keyframes scanPulse{
+  0%,100%{box-shadow:0 0 0 1px rgba(54,243,162,.22),0 0 14px rgba(54,243,162,.32),0 0 30px rgba(54,243,162,.16)}
+  50%{box-shadow:0 0 0 1px rgba(140,255,202,.34),0 0 26px rgba(54,243,162,.62),0 0 60px rgba(54,243,162,.3)}
+}
+.btn-scan-repeat{
+  border-color:rgba(165,190,220,.28);
+  color:#cfe0f3;
+  background:rgba(43,58,84,.86);
+  box-shadow:0 0 0 1px rgba(165,190,220,.08);
+  animation:none;
+  text-shadow:none;
+}
+.btn-scan-repeat:hover:not(:disabled){
+  border-color:rgba(210,226,248,.44);
+  color:#f5fbff;
+  background:rgba(58,77,108,.96);
+  box-shadow:0 0 0 1px rgba(210,226,248,.14),0 0 16px rgba(102,144,198,.16);
+  transform:translateY(-1px);
+}
+.scan-complete-banner{
+  display:none;
+  margin:10px 0 6px;
+  padding:12px 16px;
+  border-radius:12px;
+  border:1px solid rgba(70,210,140,.32);
+  background:linear-gradient(135deg,rgba(18,76,55,.88),rgba(26,108,72,.82));
+  box-shadow:0 0 0 1px rgba(70,210,140,.08),0 0 24px rgba(39,174,96,.18);
+}
+.scan-complete-banner.show{display:block}
+.scan-complete-title{
+  font-family:'Orbitron',monospace;
+  font-size:.84rem;
+  letter-spacing:.08em;
+  color:#bff4d9;
+  margin-bottom:4px;
+}
+.scan-complete-sub{
+  font-size:.78rem;
+  color:#edf9f1;
+  line-height:1.45;
+}
 .btn-full{display:block;width:100%;text-align:center}
 .pill-toggle{display:inline-flex;border:1px solid var(--border2);border-radius:20px;overflow:hidden}
-.pill-btn{font-family:'Rajdhani',sans-serif;font-size:.72rem;font-weight:600;letter-spacing:.06em;padding:3px 12px;background:transparent;border:none;color:var(--text2);cursor:pointer;transition:all .15s}
+.pill-btn{font-family:'Rajdhani',sans-serif;font-size:.76rem;font-weight:600;letter-spacing:.06em;padding:3px 12px;background:transparent;border:none;color:var(--text2);cursor:pointer;transition:all .15s}
 .pill-btn.active{background:var(--gold);color:var(--bg)}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1.25rem}
 .metric{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.75rem 1rem}
-.metric-label{font-size:.65rem;letter-spacing:.08em;color:var(--text2);text-transform:uppercase;margin-bottom:4px}
+.metric-label{font-size:.68rem;letter-spacing:.08em;color:var(--text2);text-transform:uppercase;margin-bottom:4px}
 .metric-val{font-family:'Orbitron',monospace;font-size:1.2rem;font-weight:600;color:var(--text)}
 .metric-val.gold{color:var(--gold)}.metric-val.green{color:var(--mx)}.metric-val.purple{color:#c39bd3}
 .prog-wrap{height:3px;background:var(--bg4);border-radius:2px;overflow:hidden}
@@ -214,7 +275,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .import-banner{background:rgba(240,192,64,.06);border:1px solid rgba(240,192,64,.2);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:1rem}
 .import-icon{font-size:1.5rem;flex-shrink:0;margin-top:2px}
 .import-text h3{font-size:.85rem;font-weight:600;color:var(--gold);margin-bottom:3px}
-.import-text p{font-size:.75rem;color:var(--text2);line-height:1.5}
+.import-text p{font-size:.78rem;color:var(--text2);line-height:1.5}
 .comlink-input-row{display:flex;gap:8px;align-items:flex-end}
 .comlink-input-row .field{flex:1;margin-bottom:0}
 .status-bar{display:flex;align-items:center;gap:8px;font-size:.75rem;padding:6px 10px;border-radius:var(--radius);margin-top:8px}
@@ -224,7 +285,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .member-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;max-height:280px;overflow-y:auto;margin-top:10px}
 .member-card{background:var(--bg4);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:.78rem}
 .member-name{color:var(--text);font-weight:600}
-.member-gp{color:var(--text2);font-family:'Orbitron',monospace;font-size:.68rem}
+.member-gp{color:var(--text2);font-family:'Orbitron',monospace;font-size:.72rem}
 .member-relic-bar{display:flex;gap:2px;margin-top:4px;flex-wrap:wrap}
 .relic-pip{width:8px;height:8px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2)}
 .relic-pip.r5{background:#8e44ad}.relic-pip.r7{background:var(--gold)}
@@ -232,14 +293,14 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .unit-check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:8px}
 .unit-check{background:var(--bg4);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px}
 .unit-check-name{font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:3px}
-.unit-check-stat{font-size:.7rem;color:var(--text2)}
+.unit-check-stat{font-size:.74rem;color:var(--text2)}
 .unit-check-stat .count{color:var(--gold);font-family:'Orbitron',monospace;font-weight:600}
 .unit-check-stat .count.good{color:var(--mx)}.unit-check-stat .count.warn{color:var(--gold2)}.unit-check-stat .count.bad{color:var(--ds)}
 /* ── SETTINGS GRID ── */
 .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:1.25rem}
 .falloff-viz{display:flex;gap:3px;align-items:flex-end;height:40px}
 .daily-table{width:100%;border-collapse:collapse;font-size:.78rem}
-.daily-table th{font-size:.65rem;letter-spacing:.08em;color:var(--text2);text-transform:uppercase;padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)}
+.daily-table th{font-size:.69rem;letter-spacing:.08em;color:var(--text2);text-transform:uppercase;padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)}
 .daily-table td{padding:5px 8px;border-bottom:1px solid var(--border)}
 .daily-table td input{width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:2px 6px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.8rem;outline:none;text-align:center}
 /* ── PLANNER ── */
@@ -268,8 +329,8 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .pcard.locked-planet{opacity:.35;pointer-events:none}
 .pcard-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .pcard-name{font-family:'Orbitron',monospace;font-size:.72rem;font-weight:600;letter-spacing:.06em}
-.roster-sort-btn{background:transparent;border:none;color:var(--text3);cursor:pointer;text-align:left;padding:2px 4px;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;transition:color .15s}.roster-sort-btn:hover,.roster-sort-btn.active{color:var(--gold)}
-.align-badge{font-size:.62rem;font-weight:600;letter-spacing:.05em;padding:2px 8px;border-radius:12px}
+.roster-sort-btn{background:transparent;border:none;color:var(--text3);cursor:pointer;text-align:left;padding:2px 4px;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;transition:color .15s}.roster-sort-btn:hover,.roster-sort-btn.active{color:var(--gold)}
+.align-badge{font-size:.66rem;font-weight:600;letter-spacing:.05em;padding:2px 8px;border-radius:12px}
 .align-badge.ds{background:var(--ds-glow);color:var(--ds);border:1px solid var(--ds-dim)}
 .align-badge.mx{background:var(--mx-glow);color:var(--mx);border:1px solid var(--mx-dim)}
 .align-badge.ls{background:var(--ls-glow);color:var(--ls);border:1px solid var(--ls-dim)}
@@ -277,29 +338,29 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .align-badge.bonus-locked{background:rgba(74,85,104,.2);color:var(--text3);border:1px solid var(--border)}
 .stars-row{display:flex;gap:2px;margin-bottom:5px}
 .star{font-size:13px;color:var(--text3)}.star.on{color:var(--gold)}
-.pts-row{font-size:.75rem;color:var(--text2);margin-bottom:6px}
+.pts-row{font-size:.78rem;color:var(--text2);margin-bottom:6px}
 .pts-row b{color:var(--text)}
 .msec{margin-bottom:8px}
-.msec-head{font-size:.65rem;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.msec-head{font-size:.68rem;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;margin-bottom:5px;display:flex;align-items:center;gap:6px}
 .msec-head::after{content:'';flex:1;height:1px;background:var(--border)}
 .cm-row{display:grid;grid-template-columns:5rem 1fr 1fr;gap:5px;align-items:center;margin-bottom:4px}
-.cm-row-label{font-size:.7rem;color:var(--text2)}
+.cm-row-label{font-size:.74rem;color:var(--text2)}
 .mini-in{background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.78rem;outline:none;text-align:center;width:100%}
 .mini-in:focus{border-color:rgba(240,192,64,.5)}
-.mini-label{font-size:.58rem;color:var(--text3);text-align:center;margin-bottom:2px}
-.mini-val{font-size:.68rem;color:var(--text3);text-align:center}
+.mini-label{font-size:.64rem;color:var(--text3);text-align:center;margin-bottom:2px}
+.mini-val{font-size:.72rem;color:var(--text3);text-align:center}
 .ops-row{display:flex;gap:5px;margin-bottom:3px;flex-wrap:wrap}
 .ops-btn{width:26px;height:22px;border-radius:4px;border:1px solid var(--border2);background:var(--bg4);color:var(--text3);font-size:.65rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .ops-btn.on{background:var(--gold);border-color:var(--gold);color:var(--bg)}
-.ops-pts-note{font-size:.65rem;color:var(--text3)}
+.ops-pts-note{font-size:.7rem;color:var(--text3)}
 .sm-box{background:rgba(142,68,173,.08);border:1px solid var(--bonus-dim);border-radius:var(--radius);padding:7px 10px;margin-bottom:8px}
-.sm-box-label{font-size:.65rem;color:#c39bd3;margin-bottom:4px}
+.sm-box-label{font-size:.68rem;color:#d8b9ff;margin-bottom:4px}
 .sm-progress-row{display:flex;align-items:center;gap:8px}
 .sm-pbar{flex:1;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden}
 .sm-pfill{height:100%;background:var(--bonus);border-radius:2px;transition:width .3s}
-.sm-note{font-size:.65rem;color:var(--text3);margin-top:4px}
-.gp-deploy-note{font-size:.68rem;color:var(--text3);white-space:nowrap}
-.pnote{font-size:.68rem;margin-top:5px}
+.sm-note{font-size:.7rem;color:var(--text3);margin-top:4px}
+.gp-deploy-note{font-size:.72rem;color:var(--text3);white-space:nowrap}
+.pnote{font-size:.72rem;margin-top:5px}
 .pnote.maxed{color:var(--mx)}.pnote.need{color:var(--text3)}
 .bonus-horiz{height:2px;width:40px;background:repeating-linear-gradient(to right,var(--bonus) 0,var(--bonus) 5px,transparent 5px,transparent 10px);margin-top:12px}
 /* ── DAY PLAN ── */
@@ -312,27 +373,28 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .day-chain.mx{background:var(--mx-glow);border:1px solid var(--mx-dim)}
 .day-chain.ls{background:var(--ls-glow);border:1px solid var(--ls-dim)}
 .day-chain.bonus{background:var(--bonus-glow);border:1px solid var(--bonus-dim)}
-.day-chain-title{font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:5px}
+.day-chain-title{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:5px}
 .day-chain.ds .day-chain-title{color:var(--ds)}.day-chain.mx .day-chain-title{color:var(--mx)}.day-chain.ls .day-chain-title{color:var(--ls)}.day-chain.bonus .day-chain-title{color:#c39bd3}
 .day-planet-name{font-family:'Orbitron',monospace;font-size:.72rem;color:var(--text);margin-bottom:2px}
 .day-stars{font-size:.78rem;color:var(--gold);margin-bottom:2px}
-.day-action{font-size:.7rem;color:var(--text2);line-height:1.4}
-.day-advance{font-size:.65rem;color:var(--text3);margin-top:3px}
-.day-preload{font-size:.65rem;color:#c39bd3;font-style:italic}
+.day-action{font-size:.74rem;color:var(--text2);line-height:1.45}
+.day-breakdown{font-size:.68rem;color:var(--text3);line-height:1.5;margin-top:2px}
+.day-advance{font-size:.7rem;color:var(--text3);margin-top:4px}
+.day-preload{font-size:.7rem;color:#d8b9ff;font-style:italic}
 .day-notes{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
-.day-note{font-size:.72rem;color:var(--text2);padding:2px 0}
+.day-note{font-size:.75rem;color:var(--text2);padding:2px 0}
 .day-note.bonus{color:#c39bd3}
 .dayplan-warning{background:rgba(240,192,64,.06);border:1px solid rgba(240,192,64,.2)}
 .dayplan-warning.confirmed{background:rgba(39,174,96,.08);border-color:rgba(39,174,96,.25)}
 .dayplan-warning-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.dayplan-warning-copy{font-size:.76rem;color:var(--text2);line-height:1.55;max-width:980px}
+.dayplan-warning-copy{font-size:.8rem;color:var(--text2);line-height:1.6;max-width:980px}
 .dayplan-warning-note{font-size:.72rem;color:var(--gold);margin-top:.45rem;line-height:1.5}
 .dayplan-algo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:1rem}
 .dayplan-algo-card{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem}
 .dayplan-algo-title{font-family:'Orbitron',monospace;font-size:.68rem;letter-spacing:.08em;color:var(--text);margin-bottom:.35rem}
-.dayplan-algo-desc{font-size:.72rem;color:var(--text2);line-height:1.45;min-height:4.2em}
+.dayplan-algo-desc{font-size:.76rem;color:var(--text2);line-height:1.5;min-height:4.2em}
 .dayplan-algo-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:.65rem}
-.dayplan-algo-badge{font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid var(--border2);color:var(--text2)}
+.dayplan-algo-badge{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid var(--border2);color:var(--text2)}
 .dayplan-algo-badge.quality{border-color:rgba(39,174,96,.28);color:var(--mx)}
 .dayplan-algo-badge.complexity{border-color:rgba(240,192,64,.28);color:var(--gold)}
 .dayplan-algo-badge.runtime{border-color:rgba(41,128,185,.28);color:#7fb6de}
@@ -343,46 +405,46 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .ops-day-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .ops-day-title{font-family:'Orbitron',monospace;font-size:.7rem;letter-spacing:.08em;color:var(--gold)}
 .ops-day-points{font-size:.72rem;color:var(--mx);font-family:'Orbitron',monospace}
-.ops-day-line{font-size:.72rem;color:var(--text2);line-height:1.45;padding:2px 0}
+.ops-day-line{font-size:.75rem;color:var(--text2);line-height:1.5;padding:2px 0}
 .ops-day-line strong{color:var(--text)}
 .ops-planet-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .ops-planet-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem}
 .ops-planet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}
 .ops-planet-name{font-family:'Orbitron',monospace;font-size:.74rem;letter-spacing:.06em;color:var(--text)}
-.ops-planet-meta{font-size:.66rem;color:var(--text3);margin-top:3px}
-.ops-planet-summary{font-size:.7rem;color:var(--text2);text-align:right}
+.ops-planet-meta{font-size:.7rem;color:var(--text3);margin-top:3px}
+.ops-planet-summary{font-size:.74rem;color:var(--text2);text-align:right}
 .ops-planet-summary strong{color:var(--gold)}
 .ops-platoon{border:1px solid var(--border);border-radius:var(--radius);padding:.7rem .8rem;margin-top:8px;background:rgba(255,255,255,.015)}
 .ops-platoon.complete{border-color:var(--mx-dim);background:rgba(39,174,96,.06)}
 .ops-platoon-header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
-.ops-platoon-title{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)}
-.ops-platoon-status{font-size:.66rem;color:var(--text3)}
+.ops-platoon-title{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)}
+.ops-platoon-status{font-size:.7rem;color:var(--text3)}
 .ops-platoon-status.complete{color:var(--mx)}
 .ops-req-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:3px 0}
 .ops-req-name{font-size:.74rem;color:var(--text)}
-.ops-req-sub{font-size:.62rem;color:var(--text3)}
-.ops-req-count{font-size:.68rem;color:var(--text2);font-family:'Orbitron',monospace;white-space:nowrap}
+.ops-req-sub{font-size:.68rem;color:var(--text3)}
+.ops-req-count{font-size:.72rem;color:var(--text2);font-family:'Orbitron',monospace;white-space:nowrap}
 .ops-req-count.good{color:var(--mx)}
 .ops-req-count.warn{color:var(--gold)}
 .ops-empty{padding:1.2rem;border:1px dashed var(--border2);border-radius:var(--radius-lg);font-size:.76rem;color:var(--text2);text-align:center}
 .ops-day-picker{cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s}
 .ops-day-picker:hover{transform:translateY(-1px)}
 .ops-day-picker.active{box-shadow:0 0 0 1px rgba(255,255,255,.08),0 0 18px rgba(255,255,255,.06)}
-.ops-day-kicker{font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)}
-.ops-day-sub{font-size:.72rem;color:var(--text2);margin-top:4px;line-height:1.45}
+.ops-day-kicker{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)}
+.ops-day-sub{font-size:.75rem;color:var(--text2);margin-top:4px;line-height:1.5}
 .ops-main-stage{display:flex;flex-direction:column;gap:12px}
 .ops-planet-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .ops-planet-pill{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem .95rem;cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s}
 .ops-planet-pill:hover{transform:translateY(-1px);border-color:var(--border2)}
 .ops-planet-pill.active{border-color:rgba(240,192,64,.45);box-shadow:0 0 0 1px rgba(240,192,64,.12)}
 .ops-planet-pill-name{font-family:'Orbitron',monospace;font-size:.7rem;letter-spacing:.06em;color:var(--text)}
-.ops-planet-pill-meta{font-size:.66rem;color:var(--text3);margin-top:4px;line-height:1.45}
-.ops-planet-pill-today{font-size:.7rem;color:var(--text2);margin-top:8px}
+.ops-planet-pill-meta{font-size:.7rem;color:var(--text3);margin-top:4px;line-height:1.5}
+.ops-planet-pill-today{font-size:.74rem;color:var(--text2);margin-top:8px}
 .ops-stage-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem}
 .ops-stage-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:.85rem}
 .ops-stage-title{font-family:'Orbitron',monospace;font-size:.8rem;letter-spacing:.08em;color:var(--gold)}
-.ops-stage-sub{font-size:.72rem;color:var(--text2);line-height:1.5;margin-top:4px;max-width:760px}
-.ops-stage-meta{font-size:.68rem;color:var(--text2);text-align:right;line-height:1.5}
+.ops-stage-sub{font-size:.76rem;color:var(--text2);line-height:1.55;margin-top:4px;max-width:760px}
+.ops-stage-meta{font-size:.72rem;color:var(--text2);text-align:right;line-height:1.55}
 .ops-platoon-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .ops-platoon-day{border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem;background:rgba(255,255,255,.015)}
 .ops-platoon-day.complete{border-color:var(--mx)}
@@ -390,8 +452,8 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .ops-platoon-day.impossible{border-color:var(--ds);background:rgba(192,57,43,.08)}
 .ops-platoon-day.ready{border-color:var(--gold2)}
 .ops-platoon-day-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:.7rem}
-.ops-platoon-day-title{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)}
-.ops-platoon-day-badge{display:inline-flex;align-items:center;gap:6px;font-size:.65rem;color:var(--text2);text-align:right}
+.ops-platoon-day-title{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)}
+.ops-platoon-day-badge{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;color:var(--text2);text-align:right}
 .ops-platoon-day-dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0}
 .ops-platoon-day.complete .ops-platoon-day-dot{border-color:var(--mx);background:rgba(39,174,96,.2)}
 .ops-platoon-day.partial .ops-platoon-day-dot{border-color:#3498db;background:rgba(52,152,219,.2)}
@@ -400,14 +462,14 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .ops-slot-list{display:flex;flex-direction:column;gap:8px}
 .ops-slot-card{border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .7rem;background:rgba(0,0,0,.14)}
 .ops-slot-name{font-size:.75rem;color:var(--text);font-weight:600;line-height:1.35}
-.ops-slot-assignee{font-size:.7rem;color:var(--gold);margin-top:3px}
+.ops-slot-assignee{font-size:.74rem;color:var(--gold);margin-top:3px}
 .ops-slot-assignee.unassigned{color:var(--text3)}
-.ops-slot-meta{font-size:.64rem;color:var(--text3);line-height:1.45;margin-top:3px}
+.ops-slot-meta{font-size:.68rem;color:var(--text3);line-height:1.5;margin-top:3px}
 .ops-missing-card{margin-top:12px;border:1px dashed rgba(192,57,43,.4);border-radius:var(--radius-lg);padding:.9rem 1rem;background:rgba(192,57,43,.06)}
 .ops-missing-title{font-family:'Orbitron',monospace;font-size:.68rem;letter-spacing:.08em;color:#ffb3ac;text-transform:uppercase;margin-bottom:6px}
-.ops-missing-text{font-size:.74rem;color:var(--text2);line-height:1.5}
-.ops-missing-subtitle{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:#ffb3ac;margin-top:.75rem;margin-bottom:.35rem}
-.ops-missing-line{font-size:.72rem;color:var(--text2);line-height:1.45;padding:2px 0}
+.ops-missing-text{font-size:.78rem;color:var(--text2);line-height:1.55}
+.ops-missing-subtitle{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:#ffb3ac;margin-top:.75rem;margin-bottom:.35rem}
+.ops-missing-line{font-size:.75rem;color:var(--text2);line-height:1.5;padding:2px 0}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 @media(max-width:980px){.ops-layout{grid-template-columns:1fr}}
 @media(max-width:768px){header,.main{padding:1rem}.day-chains-grid{grid-template-columns:1fr}.settings-grid{grid-template-columns:1fr}}
@@ -476,10 +538,11 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="font-size:.8rem;font-weight:600;color:var(--text)" id="guild-name-display">—</div>
         <div style="display:flex;gap:8px">
-          <button class="btn" style="font-size:.62rem;padding:4px 10px" onclick="scanAndAnalyze()" id="scan-btn">Scan Rosters</button>
+          <button class="btn btn-scan-loud" style="font-size:.68rem;padding:7px 14px;font-weight:700" onclick="scanAndAnalyze()" id="scan-btn">⚡ Scan Rosters</button>
           <div style="font-size:.72rem;color:var(--text2);font-family:'Orbitron',monospace" id="member-gp-display">—</div>
         </div>
       </div>
+      <div id="scan-complete-banner" class="scan-complete-banner"></div>
       <div class="member-grid" id="member-grid"></div>
       <div id="roster-analysis" style="display:none;margin-top:12px">
         <div style="font-size:.72rem;color:var(--text2);margin-bottom:8px">Key ROTE units at Relic 5+ across guild</div>
@@ -815,14 +878,22 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
             style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
                    padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
         </div>
-        <div id="se-slot-wrap-7" style="display:none">
-          <div id="se-slot-label-7" style="font-size:.62rem;color:var(--text3);margin-bottom:2px">Reinforcement 3</div>
-          <input id="se-m7" type="text" list="se-unit-list" placeholder="Reinforcement 3"
-            autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
-            style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
+      <div id="se-slot-wrap-7" style="display:none">
+        <div id="se-slot-label-7" style="font-size:.62rem;color:var(--text3);margin-bottom:2px">Reinforcement 3</div>
+        <input id="se-m7" type="text" list="se-unit-list" placeholder="Reinforcement 3"
+          autocomplete="off" oninput="refreshSquadEditorSuggestions(this)" onfocus="refreshSquadEditorSuggestions(this)"
+          style="background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);
                    padding:.4rem .65rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.85rem;width:100%;box-sizing:border-box">
         </div>
         <datalist id="se-unit-list"></datalist>
+      </div>
+      <!-- Territory Battle Omicrons -->
+      <div class="field" id="se-omicron-wrap" style="display:none;margin-bottom:.75rem">
+        <label id="se-omicron-label" style="font-size:.68rem">Required Territory Battle Omicrons</label>
+        <div id="se-omicron-hint" style="font-size:.62rem;color:var(--text3);margin:.2rem 0 .4rem">
+          Check the Territory Battle omicrons this squad needs to function as intended.
+        </div>
+        <div id="se-omicron-list" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
       <!-- Notes -->
       <div class="field" style="margin-bottom:.75rem">
@@ -928,7 +999,7 @@ const DS_CHAIN = [
 const MX_CHAIN = [
   {id:'corellia',name:'Corellia', align:'mx',zone:1,cms:3,fleets:1,sms:1,smLabel:'Special Mission',                   cmPts:200000,  fleetPts:400000,  opsVal:10000000, stars:[111718750,178750000,238333333]},
   {id:'felucia', name:'Felucia',  align:'mx',zone:2,cms:4,fleets:1,sms:0,                                             cmPts:250000,  fleetPts:500000,  opsVal:11000000, stars:[148125000,237000000,316000000]},
-  {id:'tatooine',name:'Tatooine', align:'mx',zone:3,cms:4,fleets:1,sms:1,smLabel:'Krayt Dragon (→ Mandalore)',smThreshold:25,smUnlocks:'mandalore', cmPts:341250, fleetPts:682500, opsVal:13200000, stars:[190953125,305525000,407366667]},
+  {id:'tatooine',name:'Tatooine', align:'mx',zone:3,cms:3,fleets:1,sms:1,smLabel:'Unlock Mandalore Special Mission',smThreshold:25,smUnlocks:'mandalore', cmPts:341250, fleetPts:682500, opsVal:13200000, stars:[190953125,305525000,407366667]},
   {id:'kessel',  name:'Kessel',   align:'mx',zone:4,cms:3,fleets:1,sms:1,smLabel:'Special Mission',                   cmPts:493594,  fleetPts:987188,  opsVal:18480000, stars:[235143105,400243583,500304479]},
   {id:'vandor',  name:'Vandor',   align:'mx',zone:5,cms:3,fleets:1,sms:1,smLabel:'Special Mission',                   cmPts:721744,  fleetPts:1443488, opsVal:33264000, stars:[341250768,620455942,729948167]},
   {id:'hoth',    name:'Hoth',     align:'mx',zone:6,cms:4,fleets:1,sms:0,                                             cmPts:1151719, fleetPts:2303438, opsVal:86486400, stars:[582632425,1059331682,1246272567]},
@@ -942,8 +1013,8 @@ const LS_CHAIN = [
   {id:'scarif',   name:'Scarif',    align:'ls',zone:6,cms:4,fleets:1,sms:0,                                           cmPts:1151719, fleetPts:2303438, opsVal:86486400, stars:[555710999,1010383635,1188686629]},
 ];
 const BONUS_PLANETS = [
-  {id:'mandalore',name:'Mandalore',align:'bonus',zone:4,cms:3,fleets:1,sms:0,                                         cmPts:493594,  fleetPts:987188,  opsVal:18480000, stars:[197748650,316397840,396497300],unlockedBy:'tatooine',unlockedAt:25},
-  {id:'zeffo',    name:'Zeffo',    align:'bonus',zone:3,cms:3,fleets:1,sms:1,smLabel:'Special Mission',               cmPts:341250,  fleetPts:682500,  opsVal:13200000, stars:[143589583,229743333,287179167],unlockedBy:'bracca',unlockedAt:30},
+  {id:'mandalore',name:'Mandalore',align:'bonus',zone:4,cms:4,fleets:0,sms:0,                                         cmPts:493594,  fleetPts:0,       opsVal:18480000, stars:[197748650,316397840,396497300],unlockedBy:'tatooine',unlockedAt:25},
+  {id:'zeffo',    name:'Zeffo',    align:'bonus',zone:3,cms:3,fleets:0,sms:1,smLabel:'Clone Trooper Special Mission', cmPts:341250,  fleetPts:682500,  opsVal:13200000, stars:[143589583,229743333,287179167],unlockedBy:'bracca',unlockedAt:30},
 ];
 const ALL_PLANETS=[...DS_CHAIN,...MX_CHAIN,...LS_CHAIN,...BONUS_PLANETS];
 
@@ -1360,153 +1431,215 @@ function confirmOptimizerWarning(){
 
 // Planet → missions definition (editable labels can be overridden in guideData)
 const PLANET_MISSIONS = {
-  mustafar:   {phase:1,align:'ds',relic:5,name:'Mustafar',    missions:[
-    {id:'nute',   label:'Left (Nute)',   type:'cm'},
-    {id:'wat',    label:'Bot (Wat)',     type:'cm'},
-    {id:'geo',    label:'Top (Geo)',     type:'cm'},
-    {id:'lv',     label:'LV',           type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  mustafar:   {phase:1,align:'ds',relic:5,name:'Mustafar', missions:[
+    {id:'nute',  label:'Dark Side Combat 1', type:'cm',    pointsSingle:100000, points:200000, unitsText:'Dark Side'},
+    {id:'wat',   label:'Dark Side Combat 2', type:'cm',    pointsSingle:100000, points:200000, unitsText:'Dark Side'},
+    {id:'geo',   label:'Dark Side Combat 3', type:'cm',    pointsSingle:100000, points:200000, unitsText:'Dark Side'},
+    {id:'lv',    label:'Lord Vader',         type:'cm',    pointsSingle:100000, points:200000, unitsText:'Dark Side, Lord Vader', req:['LORDVADER']},
+    {id:'fleet', label:'Fleet',              type:'fleet', pointsSingle:400000, points:400000, unitsText:'Dark Side Fleet'},
   ]},
-  corellia:   {phase:1,align:'mx',relic:5,name:'Corellia',    missions:[
-    {id:'sm',     label:"Qi'ra [SM]",   type:'sm',  req:['QIRA','YOUNGHAN']},
-    {id:'combat', label:'Combat',       type:'cm'},
-    {id:'jabba',  label:'Jabba',        type:'cm'},
-    {id:'aphra',  label:'Aphra',        type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  corellia:   {phase:1,align:'mx',relic:5,name:'Corellia', missions:[
+    {id:'combat', label:'Mixed Combat',            type:'cm',    pointsSingle:100000, points:200000, unitsText:'Mixed'},
+    {id:'jabba',  label:'Jabba the Hutt',          type:'cm',    pointsSingle:100000, points:200000, unitsText:'Jabba the Hutt, Bounty Hunter, Smuggler, Hutt Cartel'},
+    {id:'aphra',  label:'Doctor Aphra',            type:'cm',    pointsSingle:100000, points:200000, unitsText:'Doctor Aphra, Droids, Smuggler, Hutt Cartel'},
+    {id:'fleet',  label:"Lando's Falcon Fleet",    type:'fleet', pointsSingle:400000, points:400000, unitsText:"Mixed Fleet, Lando's Millennium Falcon"},
+    {id:'sm',     label:"Qi'ra + Young Han [SM]",  type:'sm',    req:['QIRA','YOUNGHAN'], unitsText:"Qi'ra, Young Han Solo", rewardText:'15 Mk III Guild Tokens'},
   ]},
-  coruscant:  {phase:1,align:'ls',relic:5,name:'Coruscant',   missions:[
-    {id:'combat', label:'Combat',       type:'cm'},
-    {id:'mace',   label:'Mace/Kit',     type:'cm'},
-    {id:'jedi',   label:'Jedi',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  coruscant:  {phase:1,align:'ls',relic:5,name:'Coruscant', missions:[
+    {id:'combat',  label:'Light Side Combat 1', type:'cm',    pointsSingle:100000, points:200000, unitsText:'Light Side'},
+    {id:'combat2', label:'Light Side Combat 2', type:'cm',    pointsSingle:100000, points:200000, unitsText:'Light Side'},
+    {id:'jedi',    label:'Jedi',                type:'cm',    pointsSingle:100000, points:200000, unitsText:'Jedi'},
+    {id:'mace',    label:'Mace / Kit',          type:'cm',    pointsSingle:100000, points:200000, unitsText:'Jedi, Mace Windu, Kit Fisto', req:['MACEWINDU','KITFISTO']},
+    {id:'fleet',   label:'Outrider Fleet',      type:'fleet', pointsSingle:400000, points:400000, unitsText:'Light Side Fleet, Outrider'},
   ]},
-  geonosis:   {phase:2,align:'ds',relic:6,name:'Geonosis',    missions:[
-    {id:'reek',   label:'Left (Reek)',  type:'cm'},
-    {id:'acklay', label:'Bot (Acklay)', type:'cm'},
-    {id:'nexu',   label:'Top (Nexu)',   type:'cm'},
-    {id:'combat', label:'Combat',       type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  geonosis:   {phase:2,align:'ds',relic:6,name:'Geonosis', missions:[
+    {id:'reek',   label:'Dark Side Combat 1', type:'cm',    pointsSingle:125000, points:250000, unitsText:'Dark Side'},
+    {id:'acklay', label:'Dark Side Combat 2', type:'cm',    pointsSingle:125000, points:250000, unitsText:'Dark Side'},
+    {id:'nexu',   label:'Dark Side Combat 3', type:'cm',    pointsSingle:125000, points:250000, unitsText:'Dark Side'},
+    {id:'combat', label:'Geonosians',         type:'cm',    pointsSingle:125000, points:250000, unitsText:'Dark Side, Geonosian'},
+    {id:'fleet',  label:'Fleet',              type:'fleet', pointsSingle:500000, points:500000, unitsText:'Dark Side Fleet'},
   ]},
-  felucia:    {phase:2,align:'mx',relic:6,name:'Felucia',     missions:[
-    {id:'hondo',  label:'Top (Hondo)',  type:'cm'},
-    {id:'jabba',  label:'Jabba',        type:'cm'},
-    {id:'bh',     label:'Bounty Hunters',type:'cm'},
-    {id:'combat', label:'Combat',       type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  felucia:    {phase:2,align:'mx',relic:6,name:'Felucia', missions:[
+    {id:'combat', label:'Mixed Combat',      type:'cm',    pointsSingle:125000, points:250000, unitsText:'Mixed'},
+    {id:'bh',     label:'Young Lando',       type:'cm',    pointsSingle:125000, points:250000, unitsText:'Young Lando Calrissian, Scoundrel, Smuggler'},
+    {id:'jabba',  label:'Jabba the Hutt',    type:'cm',    pointsSingle:125000, points:250000, unitsText:'Jabba the Hutt, Bounty Hunter, Smuggler, Hutt Cartel'},
+    {id:'hondo',  label:'Hondo [SM]',        type:'sm',    estimateGroup:'cm', pointsSingle:125000, points:250000, unitsText:'Hondo Ohnaka, Scoundrel, Smuggler, Bounty Hunter'},
+    {id:'fleet',  label:'Fleet',             type:'fleet', pointsSingle:500000, points:500000, unitsText:'Mixed Fleet'},
   ]},
-  bracca:     {phase:2,align:'ls',relic:6,name:'Bracca',      missions:[
-    {id:'jedi',   label:'Jedi',         type:'cm'},
-    {id:'jtr',    label:'JTR',          type:'cm'},
-    {id:'open',   label:'Open',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
-    {id:'sm',     label:'SM → Zeffo',   type:'sm',  req:['JEDIKNIGHTCAL','CEREJUNDA']},
+  bracca:     {phase:2,align:'ls',relic:6,name:'Bracca', missions:[
+    {id:'jtr',   label:'Light Side Combat 1',  type:'cm',    pointsSingle:125000, points:250000, unitsText:'Light Side'},
+    {id:'jedi',  label:'Jedi',                  type:'cm',    pointsSingle:125000, points:250000, unitsText:'Jedi'},
+    {id:'open',  label:'Light Side Combat 2',   type:'cm',    pointsSingle:125000, points:250000, unitsText:'Light Side'},
+    {id:'fleet', label:'Fleet',                 type:'fleet', pointsSingle:500000, points:500000, unitsText:'Light Side Fleet'},
+    {id:'sm',    label:'Unlock Zeffo [SM]',     type:'sm',    relic:7, req:['JEDIKNIGHTCAL','CEREJUNDA'], unitsText:'Cere Junda, Jedi Knight Cal Kestis', rewardText:'15 Mk III Guild Tokens', unlocks:'zeffo'},
   ]},
-  dathomir:   {phase:3,align:'ds',relic:7,name:'Dathomir',    missions:[
-    {id:'cm1',    label:'CM 1',         type:'cm'},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'cm4',    label:'CM 4',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
-    {id:'sm',     label:'SM',           type:'sm'},
+  dathomir:   {phase:3,align:'ds',relic:7,name:'Dathomir', missions:[
+    {id:'cm1', label:'Dark Side Combat 1', type:'cm', pointsSingle:162500, points:341250, unitsText:'Dark Side'},
+    {id:'cm2', label:'Dark Side Combat 2', type:'cm', pointsSingle:162500, points:341250, unitsText:'Dark Side'},
+    {id:'cm3', label:'Empire',             type:'cm', pointsSingle:162500, points:341250, unitsText:'Empire, Dark Side'},
+    {id:'cm4', label:'Doctor Aphra',       type:'cm', pointsSingle:162500, points:341250, unitsText:'Doctor Aphra, Dark Side, Droids, Hutt Cartel'},
+    {id:'sm',  label:'Merrin [SM]',        type:'sm', unitsText:'Nightsister, Merrin', rewardText:'Merrin shards'},
   ]},
-  tatooine:   {phase:3,align:'mx',relic:7,name:'Tatooine',    missions:[
-    {id:'fennec', label:'Fennec',        type:'cm'},
-    {id:'jabba',  label:'Jabba',         type:'cm'},
-    {id:'rey',    label:"Rey/Padme",     type:'cm'},
-    {id:'combat', label:'Combat',        type:'cm'},
-    {id:'fleet',  label:'Fleet',         type:'fleet'},
-    {id:'sm',     label:'Krayt [SM] → Mandalore',type:'sm',req:['MANDALORBOKATAN','THEMANDALORIANBESKARARMOR']},
+  tatooine:   {phase:3,align:'mx',relic:7,name:'Tatooine', missions:[
+    {id:'combat', label:'Mixed Combat',           type:'cm',    pointsSingle:162500, points:341250, unitsText:'Mixed'},
+    {id:'jabba',  label:'Jabba the Hutt',         type:'cm',    pointsSingle:162500, points:341250, unitsText:'Jabba the Hutt, Bounty Hunter, Smuggler, Hutt Cartel'},
+    {id:'fennec', label:'Fennec Shand',           type:'cm',    pointsSingle:162500, points:341250, unitsText:'Fennec Shand, Bounty Hunter, Smuggler, Hutt Cartel'},
+    {id:'fleet',  label:'Executor Fleet',         type:'fleet', pointsSingle:682500, points:682500, unitsText:'Mixed Fleet, Executor'},
+    {id:'rey',    label:'Third Sister [SM]',      type:'sm',    unitsText:'Inquisitorius, Third Sister', rewardText:'Third Sister shards'},
+    {id:'sm',     label:'Unlock Mandalore [SM]',  type:'sm',    req:['MANDALORBOKATAN','THEMANDALORIANBESKARARMOR'], unitsText:"Bo-Katan (Mand'alor), The Mandalorian (Beskar Armor)", rewardText:'15 Mk III Guild Tokens', unlocks:'mandalore'},
   ]},
-  kashyyyk:   {phase:3,align:'ls',relic:7,name:'Kashyyyk',    missions:[
-    {id:'wookies',label:'Wookies (5× LS)',type:'cm',req:['TARFFUL']},
-    {id:'cm2',    label:'CM 2',           type:'cm'},
-    {id:'cm3',    label:'CM 3',           type:'cm'},
-    {id:'fleet',  label:'Fleet',          type:'fleet'},
-    {id:'sm',     label:'Saw [SM]',       type:'sm',req:['SAWGERRERA']},
+  kashyyyk:   {phase:3,align:'ls',relic:7,name:'Kashyyyk', missions:[
+    {id:'wookies', label:'Wookiees',             type:'cm',    pointsSingle:162500, points:341250, unitsText:'Wookiee'},
+    {id:'cm2',     label:'Light Side Combat 1',  type:'cm',    pointsSingle:162500, points:341250, unitsText:'Light Side'},
+    {id:'cm3',     label:'Light Side Combat 2',  type:'cm',    pointsSingle:162500, points:341250, unitsText:'Light Side'},
+    {id:'fleet',   label:'Profundity Fleet',     type:'fleet', pointsSingle:682500, points:682500, unitsText:'Light Side Fleet, Profundity'},
+    {id:'sm',      label:'Saw Gerrera [SM]',     type:'sm',    req:['SAWGERRERA'], unitsText:'Rebel Fighter, Saw Gerrera', rewardText:'50 Mk II Guild Tokens'},
   ]},
-  zeffo:      {phase:3,align:'ls',relic:7,name:'Zeffo (Bonus)',missions:[
-    {id:'ufu_top',label:'UFU (Top)',      type:'cm'},
-    {id:'ufu_mid',label:'UFU (Mid)',      type:'cm'},
-    {id:'cal',    label:'Cal Kestis',     type:'cm'},
-    {id:'cm4',    label:'Combat',         type:'cm'},
-    {id:'sm',     label:'SM',             type:'sm',req:['JEDIKNIGHTCAL','CEREJUNDA']},
+  zeffo:      {phase:3,align:'ls',relic:7,name:'Zeffo (Bonus)', missions:[
+    {id:'ufu_top', label:'UFU Combat 1',             type:'cm', pointsSingle:162500, points:341250, unitsText:'Unaligned Force User'},
+    {id:'ufu_mid', label:'UFU Combat 2',             type:'cm', pointsSingle:162500, points:341250, unitsText:'Unaligned Force User'},
+    {id:'cal',     label:'Jedi Knight Cal Kestis',   type:'cm', pointsSingle:487500, points:1023750, unitsText:'Jedi Knight Cal Kestis, Cere Junda, Light Side', req:['JEDIKNIGHTCAL','CEREJUNDA']},
+    {id:'sm',      label:'Clone Trooper [SM]',       type:'sm', unitsText:'Clone Trooper', rewardText:'Special mission reward'},
   ]},
   medstation: {phase:4,align:'ds',relic:8,name:'Med Station', missions:[
-    {id:'cm1',    label:'CM 1',         type:'cm'},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'cm4',    label:'CM 4',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
-    {id:'sm',     label:'SM',           type:'sm'},
+    {id:'cm1', label:'Dark Side Combat 1',           type:'cm', pointsSingle:219375, points:493594, unitsText:'Dark Side'},
+    {id:'cm2', label:'Dark Side Combat 2',           type:'cm', pointsSingle:219375, points:493594, unitsText:'Dark Side'},
+    {id:'cm3', label:'Dark Side Combat 3',           type:'cm', pointsSingle:219375, points:493594, unitsText:'Dark Side'},
+    {id:'cm4', label:'Dark Trooper Moff Gideon',     type:'cm', pointsSingle:219375, points:493594, unitsText:'Dark Trooper Moff Gideon, Imperial Remnant', req:['MOFFGIDEONS3']},
+    {id:'sm',  label:'Great Mothers [SM]',           type:'sm', unitsText:'Night Trooper, Imperial Remnant, Great Mothers', rewardText:'Special mission reward'},
   ]},
-  kessel:     {phase:4,align:'mx',relic:8,name:'Kessel',      missions:[
-    {id:'cm1',    label:'CM 1',         type:'cm'},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
-    {id:'sm',     label:"Qi'ra [SM]",   type:'sm',  req:['QIRA','L3_37']},
+  kessel:     {phase:4,align:'mx',relic:8,name:'Kessel', missions:[
+    {id:'cm1',   label:'Mixed Combat 1',            type:'cm',    pointsSingle:219375, points:493594, unitsText:'Mixed'},
+    {id:'cm2',   label:'Mixed Combat 2',            type:'cm',    pointsSingle:219375, points:493594, unitsText:'Mixed'},
+    {id:'cm3',   label:'Hutt Cartel',               type:'cm',    pointsSingle:219375, points:493594, unitsText:'Hutt Cartel'},
+    {id:'fleet', label:'Fleet',                     type:'fleet', pointsSingle:987188, points:987188, unitsText:'Mixed Fleet'},
+    {id:'sm',    label:"Qi'ra + L3-37 [SM]",        type:'sm',    req:['QIRA','L3_37'], unitsText:"Qi'ra, L3-37", rewardText:'15 Mk III Guild Tokens'},
   ]},
-  lothal:     {phase:4,align:'ls',relic:8,name:'Lothal',      missions:[
-    {id:'jmk',    label:'JMK/Open',     type:'cm'},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  lothal:     {phase:4,align:'ls',relic:8,name:'Lothal', missions:[
+    {id:'jmk',   label:'Jedi',                      type:'cm',    pointsSingle:219375, points:493594, unitsText:'Jedi'},
+    {id:'cm2',   label:'Phoenix',                   type:'cm',    pointsSingle:219375, points:493594, unitsText:'Phoenix'},
+    {id:'cm3',   label:'Light Side Combat',         type:'cm',    pointsSingle:219375, points:493594, unitsText:'Light Side'},
+    {id:'fleet', label:'Fleet',                     type:'fleet', pointsSingle:987188, points:987188, unitsText:'Light Side Fleet'},
   ]},
-  mandalore:  {phase:4,align:'ds',relic:8,name:'Mandalore (Bonus)',missions:[
-    {id:'dtmg',   label:'DTMG',         type:'cm',  req:['MOFFGIDEONS3']},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'cm4',    label:'CM 4',         type:'cm'},
+  mandalore:  {phase:4,align:'ds',relic:8,name:'Mandalore (Bonus)', missions:[
+    {id:'dtmg',  label:'Dark Trooper Moff Gideon',  type:'cm',    pointsSingle:219375, points:493594, unitsText:'Dark Trooper Moff Gideon, Imperial Remnant', req:['MOFFGIDEONS3']},
+    {id:'cm2',   label:'Dark Side Combat 1',        type:'cm',    pointsSingle:219375, points:493594, unitsText:'Dark Side'},
+    {id:'cm3',   label:'Dark Side Combat 2',        type:'cm',    pointsSingle:219375, points:493594, unitsText:'Dark Side'},
+    {id:'cm4',   label:"Bo-Katan (Mand'alor)",      type:'cm',    relic:9, pointsSingle:658125, points:1480782, unitsText:"Bo-Katan (Mand'alor), Light Side, Mandalorian", req:['MANDALORBOKATAN']},
   ]},
-  malachor:   {phase:5,align:'ds',relic:8,name:'Malachor',    missions:[
-    {id:'cm1',    label:'CM 1',         type:'cm'},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'cm4',    label:'CM 4',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  malachor:   {phase:5,align:'ds',relic:8,name:'Malachor', missions:[
+    {id:'cm1', label:'Dark Side Combat 1',               type:'cm', pointsSingle:307125, points:721744, unitsText:'Dark Side'},
+    {id:'cm2', label:'Dark Side Combat 2',               type:'cm', pointsSingle:307125, points:721744, unitsText:'Dark Side'},
+    {id:'cm3', label:'Dark Side Combat 3',               type:'cm', pointsSingle:307125, points:721744, unitsText:'Dark Side'},
+    {id:'cm4', label:'Eighth / Fifth / Seventh Sister',  type:'cm', pointsSingle:721744, points:721744, unitsText:'Eighth Brother, Fifth Brother, Seventh Sister'},
   ]},
-  vandor:     {phase:5,align:'mx',relic:8,name:'Vandor',      missions:[
-    {id:'cm1',    label:'CM 1',         type:'cm'},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
-    {id:'sm',     label:'SM',           type:'sm'},
+  vandor:     {phase:5,align:'mx',relic:8,name:'Vandor', missions:[
+    {id:'cm1',   label:'Mixed Combat 1',                  type:'cm',    pointsSingle:307125, points:721744, unitsText:'Mixed'},
+    {id:'cm2',   label:'Mixed Combat 2',                  type:'cm',    pointsSingle:307125, points:721744, unitsText:'Mixed'},
+    {id:'cm3',   label:'Jabba the Hutt',                  type:'cm',    pointsSingle:307125, points:721744, unitsText:'Jabba the Hutt, Hutt Cartel, Smuggler, Bounty Hunter'},
+    {id:'fleet', label:'Fleet',                           type:'fleet', pointsSingle:1443488, points:1443488, unitsText:'Mixed Fleet'},
+    {id:'sm',    label:'Young Han + Vandor Chewie [SM]',  type:'sm',    unitsText:'Young Han Solo, Vandor Chewbacca', rewardText:'Special mission reward'},
   ]},
-  kafrene:    {phase:5,align:'ls',relic:8,name:'Kafrene',     missions:[
-    {id:'cm1',    label:'CM 1',         type:'cm'},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'cm4',    label:'CM 4',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  kafrene:    {phase:5,align:'ls',relic:8,name:'Kafrene', missions:[
+    {id:'cm1',   label:'Light Side Combat 1',             type:'cm',    pointsSingle:307125, points:721744, unitsText:'Light Side'},
+    {id:'cm2',   label:'Light Side Combat 2',             type:'cm',    pointsSingle:307125, points:721744, unitsText:'Light Side'},
+    {id:'cm3',   label:'Light Side Combat 3',             type:'cm',    pointsSingle:307125, points:721744, unitsText:'Light Side'},
+    {id:'cm4',   label:'Cassian Andor + K-2SO',           type:'cm',    pointsSingle:307125, points:721744, unitsText:'Cassian Andor, K-2SO, Rebel Fighter, Light Side, Rogue One', req:['CASSIANANDOR','K2SO']},
+    {id:'fleet', label:'Fleet',                           type:'fleet', pointsSingle:1443488, points:1443488, unitsText:'Light Side Fleet'},
   ]},
-  deathstar:  {phase:6,align:'ds',relic:9,name:'Death Star',  missions:[
-    {id:'dv',     label:'Darth Vader',  type:'cm',  req:['VADER']},
-    {id:'iden',   label:'Iden Versio',  type:'cm',  req:['IDENVERSIOEMPIRE']},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'cm4',    label:'CM 4',         type:'cm'},
-    {id:'fleet',  label:'Fleet (TIE)',  type:'fleet'},
+  deathstar:  {phase:6,align:'ds',relic:9,name:'Death Star', missions:[
+    {id:'cm3',   label:'Dark Side Combat 1',              type:'cm',    pointsSingle:460668, points:1151719, unitsText:'Dark Side'},
+    {id:'cm4',   label:'Dark Side Combat 2',              type:'cm',    pointsSingle:460668, points:1151719, unitsText:'Dark Side'},
+    {id:'dv',    label:'Darth Vader',                     type:'cm',    pointsSingle:460668, points:1151719, unitsText:'Darth Vader, Dark Side', req:['VADER']},
+    {id:'iden',  label:'Iden Versio',                     type:'cm',    pointsSingle:460668, points:1151719, unitsText:'Iden Versio, Dark Side, Empire, Imperial Trooper', req:['IDENVERSIOEMPIRE']},
+    {id:'fleet', label:'Fleet',                           type:'fleet', pointsSingle:2303438, points:2303438, unitsText:'Dark Side Fleet'},
   ]},
-  hoth:       {phase:6,align:'mx',relic:9,name:'Hoth',        missions:[
-    {id:'cm1',    label:'CM 1',         type:'cm'},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'cm4',    label:'CM 4',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  hoth:       {phase:6,align:'mx',relic:9,name:'Hoth', missions:[
+    {id:'cm1',   label:'Mixed Combat 1',                  type:'cm', pointsSingle:460668, points:1151719, unitsText:'Mixed'},
+    {id:'cm2',   label:'Mixed Combat 2',                  type:'cm', pointsSingle:460668, points:1151719, unitsText:'Mixed'},
+    {id:'cm3',   label:'Jabba the Hutt',                  type:'cm', pointsSingle:460668, points:1151719, unitsText:'Jabba the Hutt, Smuggler, Bounty Hunter, Hutt Cartel'},
+    {id:'cm4',   label:'Doctor Aphra [SM]',               type:'sm', estimateGroup:'cm', pointsSingle:460668, points:1151719, unitsText:'Doctor Aphra, BT-1, 0-0-0'},
+    {id:'fleet', label:'Fleet',                           type:'fleet', pointsSingle:2303438, points:2303438, unitsText:'Mixed Fleet'},
   ]},
-  scarif:     {phase:6,align:'ls',relic:9,name:'Scarif',      missions:[
-    {id:'cm1',    label:'CM 1',         type:'cm'},
-    {id:'cm2',    label:'CM 2',         type:'cm'},
-    {id:'cm3',    label:'CM 3',         type:'cm'},
-    {id:'cm4',    label:'CM 4',         type:'cm'},
-    {id:'fleet',  label:'Fleet',        type:'fleet'},
+  scarif:     {phase:6,align:'ls',relic:9,name:'Scarif', missions:[
+    {id:'cm1',   label:'Light Side Combat 1',             type:'cm',    pointsSingle:460668, points:1151719, unitsText:'Light Side'},
+    {id:'cm2',   label:'Light Side Combat 2',             type:'cm',    pointsSingle:460668, points:1151719, unitsText:'Light Side'},
+    {id:'cm3',   label:'Baze / Chirrut / SRP',            type:'cm',    pointsSingle:460668, points:1151719, unitsText:'Baze Malbus, Chirrut Imwe, Scarif Rebel Pathfinder, Light Side'},
+    {id:'cm4',   label:'Cassian / Pao / K-2SO',           type:'cm',    pointsSingle:460668, points:1151719, unitsText:'Cassian Andor, Pao, K-2SO, Light Side'},
+    {id:'fleet', label:'Fleet',                           type:'fleet', pointsSingle:2303438, points:2303438, unitsText:'Light Side Fleet'},
   ]},
 };
+
+function missionRelicRequirement(planet, mission){
+  return Number(mission?.relic || planet?.relic || 0);
+}
+
+function missionEstimateGroup(mission){
+  if(!mission) return 'none';
+  if(mission.estimateGroup) return mission.estimateGroup;
+  if(mission.type === 'fleet') return Number(mission.points || 0) > 0 ? 'fleet' : 'none';
+  return Number(mission.points || 0) > 0 ? 'cm' : 'none';
+}
+
+function getPlanetMissionBuckets(pid){
+  const planet = PLANET_MISSIONS[pid];
+  const missions = Array.isArray(planet?.missions) ? planet.missions : [];
+  return {
+    all: missions,
+    combat: missions.filter(m=>missionEstimateGroup(m)==='cm'),
+    fleet: missions.filter(m=>missionEstimateGroup(m)==='fleet'),
+    special: missions.filter(m=>m.type==='sm')
+  };
+}
+
+function getPlanetMissionEstimateMeta(pid){
+  const buckets = getPlanetMissionBuckets(pid);
+  return {
+    ...buckets,
+    combatTotalPoints: buckets.combat.reduce((sum, mission)=>sum + (Number(mission.points) || 0), 0),
+    fleetTotalPoints: buckets.fleet.reduce((sum, mission)=>sum + (Number(mission.points) || 0), 0),
+    nonPointSpecial: buckets.special.filter(m=>missionEstimateGroup(m)==='none')
+  };
+}
+
+function projectCombatMissionPoints(mission, expectedCompletions){
+  const full = Number(mission?.points || 0);
+  const single = Number(mission?.pointsSingle || 0) || full;
+  if(full <= 0) return 0;
+  if(single > 0 && single < full){
+    const fullClears = Math.floor(expectedCompletions);
+    const partial = (expectedCompletions - fullClears) >= 0.5 ? single : 0;
+    return (fullClears * full) + partial;
+  }
+  return Math.round(expectedCompletions) * full;
+}
+
+function projectFleetMissionPoints(mission, expectedCompletions){
+  const full = Number(mission?.points || 0);
+  if(full <= 0) return 0;
+  return Math.round(expectedCompletions) * full;
+}
+
+function formatGuideMissionReward(mission){
+  if(!mission) return '';
+  const full = Number(mission.points || 0);
+  const single = Number(mission.pointsSingle || 0);
+  if(full > 0){
+    if(single > 0 && single !== full) return fmt(single)+' -> '+fmt(full)+' territory points per member';
+    return fmt(full)+' territory points per member';
+  }
+  return mission.rewardText || '';
+}
 
 // Mutable guide data — squads[missionKey] = array of squad objects
 let guideData = normalizeGuideData({version:1, squads:{}});
 let _activeGuide = null; // {planetId, missionId}
 let _editingSquad = null; // {planetId, missionId, squadId} or null for new
 let _guideDiff = 'auto'; // current difficulty selector state
+const GUIDE_TB_OMICRON_AREA = 7;
+let _guideTbOmicronMap = {};
+let _guideTbOmicronLoadPromise = null;
+let _guideEditorTbOmicronSelections = new Set();
 
 function _mKey(pid, mid){ return pid+'___'+mid; }
 function _getSquads(pid, mid){ return guideData.squads[_mKey(pid,mid)] || []; }
@@ -1639,11 +1772,14 @@ function renderGuideMission(pid, mid){
 
   const squads = _getSquads(pid, mid);
   const alignClr = {ds:'var(--ds)',mx:'var(--mx)',ls:'var(--ls)'}[planet.align]||'var(--text)';
-  const typeLabel = mission.type==='sm'?'Special Mission':mission.type==='fleet'?'Fleet Mission':'Combat Mission';
+  const typeLabel = mission.unlocks
+    ? 'Special Unlock Mission'
+    : (mission.type==='sm' ? 'Special Mission' : mission.type==='fleet' ? 'Fleet Mission' : 'Combat Mission');
   const isFleetMission = mission.type === 'fleet';
+  const missionRelic = missionRelicRequirement(planet, mission);
   const missionRequirementLabel = isFleetMission
     ? ('Phase '+planet.phase+' &middot; 7-star ships required')
-    : ('Phase '+planet.phase+' &middot; R'+planet.relic+'+ required');
+    : ('Phase '+planet.phase+' &middot; R'+missionRelic+'+ required');
 
   // Member roster check helper
   const selectedAc = document.getElementById('guide-member-sel')?.value||'';
@@ -1651,9 +1787,18 @@ function renderGuideMission(pid, mid){
 
   function checkRosterForSquad(squad){
     if(!memberRoster) return null; // no member selected
-    const relic = planet.relic;
+    const relic = missionRelic;
     const rawMembers = (squad.members||[]).slice(0, isFleetMission ? GUIDE_FLEET_MEMBER_INPUT_IDS.length : GUIDE_STANDARD_MEMBER_INPUT_IDS.length);
     const rawMemberDefIds = Array.isArray(squad.memberDefIds) ? squad.memberDefIds : [];
+    const requiredTbOmicronMap = {};
+    if(!isFleetMission){
+      getGuideSquadTbOmicronRequirements(squad).forEach(req=>{
+        const key = defIdKey(req.unitDefId);
+        if(!key) return;
+        if(!requiredTbOmicronMap[key]) requiredTbOmicronMap[key] = [];
+        requiredTbOmicronMap[key].push(req);
+      });
+    }
     const entries = [];
     const leaderName = String(squad.leader||'').trim();
     const leaderDefId = normalizeDefId(squad.leaderDefId).toUpperCase();
@@ -1727,6 +1872,32 @@ function renderGuideMission(pid, mid){
         ok:false,
         reason:'R'+(ru.relic||0)+' (need R'+relic+')'
       };
+      if(!isFleetMission){
+        const omicronReqs = requiredTbOmicronMap[defIdKey(entry.defId || ru.defId || entry.name)] || [];
+        if(omicronReqs.length){
+          const unlockedTbOmicronKeys = new Set(
+            (ru.skills || [])
+              .filter(skill=>skill && skill.hasOmicron && Number(skill.omicronArea || 0) === GUIDE_TB_OMICRON_AREA)
+              .map(skill=>normalizeGuideSkillKey(skill.skillId || skill.id))
+              .filter(Boolean)
+          );
+          const missingOmicrons = omicronReqs.filter(req=>
+            !unlockedTbOmicronKeys.has(normalizeGuideSkillKey(req.skillId))
+          );
+          if(missingOmicrons.length){
+            return {
+              ...entry,
+              ok:false,
+              reason:'Missing TB omicron: '+missingOmicrons.map(req=>req.skillName || req.skillId).join(', ')
+            };
+          }
+          return {
+            ...entry,
+            ok:true,
+            reason:'R'+ru.relic+' | TB omi ready'
+          };
+        }
+      }
       return {
         ...entry,
         ok:true,
@@ -1757,6 +1928,13 @@ function renderGuideMission(pid, mid){
   html += '<div style="font-family:\'Orbitron\',monospace;font-size:.85rem;letter-spacing:.06em;color:var(--text)">'+
     escHtml(planet.name)+' — '+escHtml(mission.label)+'</div>';
   html += '<div style="font-size:.65rem;color:'+alignClr+';margin-top:2px">'+typeLabel+' &middot; '+missionRequirementLabel+'</div>';
+  if(mission.unitsText){
+    html += '<div style="font-size:.72rem;color:var(--text2);margin-top:6px">Allowed / required units: <span style="color:var(--text)">'+escHtml(mission.unitsText)+'</span></div>';
+  }
+  const rewardSummary = formatGuideMissionReward(mission);
+  if(rewardSummary){
+    html += '<div style="font-size:.7rem;color:var(--text2);margin-top:3px">Mission reward: <span style="color:var(--text)">'+escHtml(rewardSummary)+'</span></div>';
+  }
   html += '</div>';
   html += '<button onclick="openSquadEditor(\''+pid+'\',\''+mid+'\',null)" '+
     'style="font-size:.7rem;padding:5px 14px;border:1px solid var(--gold2);background:var(--gold);'+
@@ -1846,9 +2024,24 @@ function renderGuideMission(pid, mid){
         html += '<div style="font-size:.72rem;color:var(--text2);margin-bottom:4px">'+
           '<span style="color:var(--text3)">Notes: </span>'+escHtml(squad.notes)+'</div>';
       }
-      if(squad.videoUrl){
+      const requiredTbOmicrons = getGuideSquadTbOmicronRequirements(squad);
+      if(requiredTbOmicrons.length){
+        const byUnit = {};
+        requiredTbOmicrons.forEach(req=>{
+          const unitLabel = req.unitName || defIdToName(req.unitDefId, '');
+          if(!byUnit[unitLabel]) byUnit[unitLabel] = [];
+          byUnit[unitLabel].push(req.skillName || req.skillId);
+        });
+        const omicronText = Object.entries(byUnit)
+          .map(([unitName, skills])=>unitName + ': ' + skills.join(', '))
+          .join(' | ');
+        html += '<div style="font-size:.72rem;color:var(--text2);margin-bottom:4px">'+
+          '<span style="color:var(--text3)">TB Omicrons: </span>'+escHtml(omicronText)+'</div>';
+      }
+      const watchUrl = normalizeExternalUrl(squad.videoUrl);
+      if(watchUrl){
         html += '<div style="margin-bottom:4px">'+
-          '<a href="'+escHtml(squad.videoUrl)+'" target="_blank" '+
+          '<a href="'+escHtml(watchUrl)+'" target="_blank" rel="noopener noreferrer" '+
           'style="font-size:.7rem;color:var(--gold);text-decoration:none">&#9654; Watch Video</a></div>';
       }
       // Controls
@@ -1932,6 +2125,188 @@ function _guideUnitSelectionKey(name, defId=''){
 function _isCapitalShipRef(nameOrDefId){
   const key = defIdKey(resolveUnitNameToDefId(nameOrDefId) || nameOrDefId);
   return CAPITAL_SHIP_DEFIDS.has(key);
+}
+
+function normalizeGuideSkillKey(skillId){
+  return defIdKey(skillId);
+}
+
+function normalizeGuideTbOmicronRequirement(entry){
+  const source = (entry && typeof entry === 'object') ? entry : {};
+  const unitDefId = normalizeDefId(
+    source.unitDefId ||
+    source.defId ||
+    source.unitId ||
+    source.characterDefId ||
+    source.ownerDefId
+  ).toUpperCase();
+  const skillId = normalizeDefId(
+    source.skillId ||
+    source.abilityId ||
+    source.id
+  ).toUpperCase();
+  if(!unitDefId || !skillId) return null;
+  const unitName = String(
+    source.unitName ||
+    source.characterName ||
+    source.ownerName ||
+    defIdToName(unitDefId, '')
+  ).trim();
+  const skillName = String(source.skillName || source.name || skillId).trim();
+  return {
+    unitDefId,
+    unitName: unitName || defIdToName(unitDefId, ''),
+    skillId,
+    skillName: skillName || skillId,
+  };
+}
+
+function getGuideSquadTbOmicronRequirements(squad){
+  return Array.isArray(squad?.requiredTbOmicrons)
+    ? squad.requiredTbOmicrons.map(normalizeGuideTbOmicronRequirement).filter(Boolean)
+    : [];
+}
+
+function syncGuideEditorTbOmicronSelectionsFromDom(){
+  const inputs = Array.from(document.querySelectorAll('#se-omicron-list input[data-guide-omicron="1"]'));
+  if(inputs.length){
+    _guideEditorTbOmicronSelections = new Set(
+      inputs
+        .filter(input=>input.checked)
+        .map(input=>normalizeGuideSkillKey(input.dataset.skillId || input.value))
+        .filter(Boolean)
+    );
+  }
+  return _guideEditorTbOmicronSelections;
+}
+
+function toggleGuideTbOmicronSelection(input){
+  const key = normalizeGuideSkillKey(input?.dataset?.skillId || input?.value);
+  if(!key) return;
+  if(input.checked) _guideEditorTbOmicronSelections.add(key);
+  else _guideEditorTbOmicronSelections.delete(key);
+}
+
+function collectGuideEditorCharacterUnits(){
+  if(!_editingSquad) return [];
+  const ids = ['se-leader'].concat(_getGuideEditorMemberInputIds(_editingSquad.pid, _editingSquad.mid));
+  const seen = new Set();
+  const units = [];
+  ids.forEach(id=>{
+    const value = String(document.getElementById(id)?.value || '').trim();
+    const defId = normalizeDefId(resolveUnitNameToDefId(value)).toUpperCase();
+    if(!defId || seen.has(defIdKey(defId))) return;
+    if(inferUnitCombatType({defId}) === 2) return;
+    seen.add(defIdKey(defId));
+    units.push({defId, name:value || defIdToName(defId, '')});
+  });
+  return units;
+}
+
+async function ensureGuideTbOmicronMap(force=false){
+  if(!force && Object.keys(_guideTbOmicronMap || {}).length) return _guideTbOmicronMap;
+  if(_guideTbOmicronLoadPromise && !force) return _guideTbOmicronLoadPromise;
+  _guideTbOmicronLoadPromise = fetch('/api/guide-tb-omicrons', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:'{}'
+  }).then(resp=>resp.json())
+    .then(data=>{
+      if(data?.status === 'ok' && data.units && typeof data.units === 'object'){
+        _guideTbOmicronMap = data.units;
+      }
+      return _guideTbOmicronMap;
+    })
+    .catch(err=>{
+      console.warn('[ROTE] TB omicron metadata unavailable:', err.message);
+      return _guideTbOmicronMap;
+    })
+    .finally(()=>{
+      _guideTbOmicronLoadPromise = null;
+      renderGuideTbOmicronOptions();
+    });
+  return _guideTbOmicronLoadPromise;
+}
+
+function renderGuideTbOmicronOptions(){
+  const wrap = document.getElementById('se-omicron-wrap');
+  const list = document.getElementById('se-omicron-list');
+  const hint = document.getElementById('se-omicron-hint');
+  if(!wrap || !list || !_editingSquad) return;
+
+  if(_getGuideMissionUnitGroup(_editingSquad.pid, _editingSquad.mid) === 'ships'){
+    wrap.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+
+  syncGuideEditorTbOmicronSelectionsFromDom();
+  const units = collectGuideEditorCharacterUnits();
+  if(!units.length){
+    wrap.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+
+  if(!Object.keys(_guideTbOmicronMap || {}).length && _guideTbOmicronLoadPromise){
+    wrap.style.display = 'block';
+    hint.textContent = 'Loading Territory Battle omicron data...';
+    list.innerHTML = '<div style="font-size:.72rem;color:var(--text3)">Checking available Territory Battle omicrons for the selected units...</div>';
+    return;
+  }
+
+  const sections = [];
+  const visibleKeys = new Set();
+  units.forEach(unit=>{
+    const abilities = Array.isArray(_guideTbOmicronMap?.[normalizeDefId(unit.defId).toUpperCase()])
+      ? _guideTbOmicronMap[normalizeDefId(unit.defId).toUpperCase()]
+      : [];
+    if(!abilities.length) return;
+    const rows = abilities.map(ability=>{
+      const skillKey = normalizeGuideSkillKey(ability.skillId);
+      if(!skillKey) return '';
+      visibleKeys.add(skillKey);
+      return '<label style="display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border:1px solid var(--border2);border-radius:8px;background:rgba(255,255,255,.02);cursor:pointer">'
+        + '<input type="checkbox" data-guide-omicron="1" data-skill-id="'+escHtml(ability.skillId)+'" data-skill-name="'+escHtml(ability.name || ability.skillId)+'" data-unit-defid="'+escHtml(unit.defId)+'" data-unit-name="'+escHtml(unit.name)+'" '
+        + (_guideEditorTbOmicronSelections.has(skillKey) ? 'checked ' : '')
+        + 'onchange="toggleGuideTbOmicronSelection(this)" style="margin-top:2px">'
+        + '<div>'
+        + '<div style="font-size:.76rem;color:var(--text);font-weight:600">'+escHtml(ability.name || ability.skillId)+'</div>'
+        + '<div style="font-size:.62rem;color:var(--text3)">Territory Battle omicron on '+escHtml(unit.name)+'</div>'
+        + '</div></label>';
+    }).filter(Boolean).join('');
+    if(rows){
+      sections.push('<div style="border:1px solid var(--border);border-radius:10px;padding:9px 10px;background:rgba(0,0,0,.08)">'
+        + '<div style="font-size:.68rem;color:var(--gold);margin-bottom:7px;font-weight:700">'+escHtml(unit.name)+'</div>'
+        + '<div style="display:flex;flex-direction:column;gap:6px">'+rows+'</div>'
+        + '</div>');
+    }
+  });
+
+  _guideEditorTbOmicronSelections = new Set(
+    [..._guideEditorTbOmicronSelections].filter(key=>visibleKeys.has(key))
+  );
+
+  if(!sections.length){
+    wrap.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  hint.textContent = 'Check the Territory Battle omicrons this squad needs to function as intended.';
+  list.innerHTML = sections.join('');
+}
+
+function collectGuideEditorRequiredTbOmicrons(){
+  return Array.from(document.querySelectorAll('#se-omicron-list input[data-guide-omicron="1"]:checked')).map(input=>
+    normalizeGuideTbOmicronRequirement({
+      unitDefId: input.dataset.unitDefid,
+      unitName: input.dataset.unitName,
+      skillId: input.dataset.skillId,
+      skillName: input.dataset.skillName,
+    })
+  ).filter(Boolean);
 }
 
 function _getGuideEditorTakenKeys(exemptInputId=''){
@@ -2018,6 +2393,7 @@ function _configureSquadEditorForMission(pid, mid){
   const startingLabel = document.getElementById('se-starting-label');
   const reinforcementLabel = document.getElementById('se-reinforcement-label');
   const leaderInput = document.getElementById('se-leader');
+  const omicronWrap = document.getElementById('se-omicron-wrap');
   const slotConfigs = isFleet
     ? [
         {id:'se-m1', label:'Starting Ship 1', placeholder:'e.g. Darth Vader\'s TIE Advanced x1', visible:true},
@@ -2058,6 +2434,7 @@ function _configureSquadEditorForMission(pid, mid){
   }
   if(startingLabel) startingLabel.style.display = isFleet ? 'block' : 'none';
   if(reinforcementLabel) reinforcementLabel.style.display = isFleet ? 'block' : 'none';
+  if(omicronWrap && isFleet) omicronWrap.style.display = 'none';
 
   slotConfigs.forEach((cfg, idx)=>{
     const input = document.getElementById(cfg.id);
@@ -2074,6 +2451,7 @@ function refreshSquadEditorSuggestions(input){
   const query = typeof input === 'string' ? input : (input?.value || '');
   const inputId = typeof input === 'string' ? 'se-leader' : (input?.id || 'se-leader');
   _buildUnitDatalist(_editingSquad.pid, _editingSquad.mid, query, inputId);
+  renderGuideTbOmicronOptions();
 }
 
 function ensureSquadEditorPortal(){
@@ -2103,18 +2481,26 @@ function openSquadEditor(pid, mid, squadId){
     });
     document.getElementById('se-notes').value  = squad.notes||'';
     document.getElementById('se-video').value  = squad.videoUrl||'';
+    _guideEditorTbOmicronSelections = new Set(
+      getGuideSquadTbOmicronRequirements(squad)
+        .map(req=>normalizeGuideSkillKey(req.skillId))
+        .filter(Boolean)
+    );
     selectDiff(squad.difficulty||'auto');
   } else {
     document.getElementById('se-leader').value = '';
     GUIDE_FLEET_MEMBER_INPUT_IDS.forEach(id=>{ document.getElementById(id).value=''; });
     document.getElementById('se-notes').value = '';
     document.getElementById('se-video').value = '';
+    _guideEditorTbOmicronSelections = new Set();
     selectDiff('auto');
   }
 
   const ov = ensureSquadEditorPortal();
   if(ov){ ov.style.display='flex'; }
   document.body.style.overflow = 'hidden';
+  renderGuideTbOmicronOptions();
+  ensureGuideTbOmicronMap();
   setTimeout(()=>{
     refreshSquadEditorSuggestions(document.getElementById('se-leader'));
     document.getElementById('se-leader').focus();
@@ -2125,6 +2511,7 @@ function closeSquadEditor(){
   const ov = document.getElementById('squad-editor-overlay');
   if(ov){ ov.style.display='none'; }
   _editingSquad = null;
+  _guideEditorTbOmicronSelections = new Set();
   document.body.style.overflow = '';
 }
 
@@ -2219,7 +2606,8 @@ function saveSquadEditor(){
     return;
   }
   const notes    = document.getElementById('se-notes').value.trim();
-  const videoUrl = document.getElementById('se-video').value.trim();
+  const videoUrl = normalizeExternalUrl(document.getElementById('se-video').value.trim());
+  const requiredTbOmicrons = isFleetMission ? [] : collectGuideEditorRequiredTbOmicrons();
 
   const squads = _getSquads(pid, mid);
 
@@ -2235,6 +2623,7 @@ function saveSquadEditor(){
         memberDefIds,
         notes,
         videoUrl,
+        requiredTbOmicrons,
         difficulty:_guideDiff
       });
     }
@@ -2248,6 +2637,7 @@ function saveSquadEditor(){
       memberDefIds,
       notes,
       videoUrl,
+      requiredTbOmicrons,
       difficulty:_guideDiff,
       order:squads.length
     }));
@@ -2528,7 +2918,7 @@ const UNIT_NAMES = {
   NUTEGUNRAY:'Nute Gunray',
   OLDBENKENOBI:'Obi-Wan Kenobi (Old Ben)',
   PADAWANOBIWAN:'Padawan Obi-Wan',
-  PADMEAMIDALA:'PadmÃ© Amidala',
+  PADMEAMIDALA:'Padmé Amidala',
   PAO:'Pao',
   PAPLOO:'Paploo',
   PAZVIZSLA:'Paz Vizsla',
@@ -2966,7 +3356,7 @@ const EXTRA_UNIT_NAMES = {
   CASSIANUNDERCOVER:'Cassian Andor (Undercover)',
   CINTA:'Cinta Kaz',
   CROSSHAIRS3:'Crosshair (Scarred)',
-  DARKREY:'Dark Rey',
+  DARKREY:'Rey (Dark Side Vision)',
   DEATHTROOPERPERIDEA:'Death Trooper (Peridea)',
   DEDRAMEERO:'Dedra Meero',
   DEPABILLABA:'Depa Billaba',
@@ -2992,20 +3382,20 @@ const EXTRA_UNIT_NAMES = {
   MAZKANATA:'Maz Kanata',
   MORGANELSBETH:'Morgan Elsbeth',
   NIGHTTROOPER:'Night Trooper',
-  OMEGAS3:'Omega',
+  OMEGAS3:'Omega (Fugitive)',
   OPERATIVE:'CX-2',
-  PADAWANSABINE:'Sabine Wren (Padawan)',
+  PADAWANSABINE:'Padawan Sabine Wren',
   QUIGGOLD:'Quiggold',
-  SCORCH:'Scorch',
+  SCORCH:'RC-1262 "Scorch"',
   SHINHATI:'Shin Hati',
   SM33:'SM-33',
   STORMTROOPERLUKE:'Stormtrooper Luke',
   STRANGER:'The Stranger',
   VADERDUELSEND:"Darth Vader (Duel's End)",
   VANE:'Vane',
-  VANGUARDTEMPLEGUARD:'Vanguard Temple Guard',
+  VANGUARDTEMPLEGUARD:'Temple Guard',
   VEL:'Vel Sartha',
-  WRECKERS3:'Wrecker',
+  WRECKERS3:'Wrecker (Mercenary)',
   YODACHEWBACCA:'Yoda & Chewie',
   ZUCKUSS:'Zuckuss',
 };
@@ -3032,9 +3422,9 @@ const SHIP_NAME_BY_DEFID = {
   FIRSTORDERTIEECHELON:'TIE Echelon',
   FURYCLASSINTERCEPTOR:'Fury-class Interceptor',
   GAUNTLETSTARFIGHTER:'Gauntlet Starfighter',
-  GEONOSIANSTARFIGHTER1:"Geonosian Soldier's Starfighter",
-  GEONOSIANSTARFIGHTER2:"Geonosian Spy's Starfighter",
-  GEONOSIANSTARFIGHTER3:"Sun Fac's Geonosian Starfighter",
+  GEONOSIANSTARFIGHTER1:"Sun Fac's Geonosian Starfighter",
+  GEONOSIANSTARFIGHTER2:"Geonosian Soldier's Starfighter",
+  GEONOSIANSTARFIGHTER3:"Geonosian Spy's Starfighter",
   GHOST:'Ghost',
   HOUNDSTOOTH:"Hound's Tooth",
   HYENABOMBER:'Hyena Bomber',
@@ -3286,7 +3676,7 @@ const ALL_CHAR_NAMES = [
   'Old Daka',
   'Omega',
   'Padawan Obi-Wan',
-  'PadmÃ© Amidala',
+  'Padmé Amidala',
   'Pao',
   'Paploo',
   'Paz Vizsla',
@@ -3379,9 +3769,26 @@ const UNIT_NAME_ALIASES = {
   'bo-katan mand\'alor': 'MANDALORBOKATAN',
   'bo-katan (mand\'alor)': 'MANDALORBOKATAN',
   'dtmg': 'MOFFGIDEONS3',
+  'dark rey': 'DARKREY',
+  'rey (dark side vision)': 'DARKREY',
+  'padme amidala': 'PADMEAMIDALA',
   'blade of dorin': 'BLADEOFDORIN',
+  'plo koon\'s jedi starfighter': 'BLADEOFDORIN',
+  'plokoonsjedistarfighter': 'BLADEOFDORIN',
+  'sun fac\'s geonosian starfighter': 'GEONOSIANSTARFIGHTER1',
+  'geonosian soldier\'s starfighter': 'GEONOSIANSTARFIGHTER2',
+  'geonosian spy\'s starfighter': 'GEONOSIANSTARFIGHTER3',
   'btl-b y-wing starfighter': 'YWINGCLONEWARS',
   'rebel y-wing': 'YWINGREBEL',
+  'scythe': 'SCYTHE',
+  'omega (fugitive)': 'OMEGAS3',
+  'padawan sabine wren': 'PADAWANSABINE',
+  'sabine wren (padawan)': 'PADAWANSABINE',
+  'rc-1262 "scorch"': 'SCORCH',
+  'rc-1262 scorch': 'SCORCH',
+  'temple guard': 'VANGUARDTEMPLEGUARD',
+  'vanguard temple guard': 'VANGUARDTEMPLEGUARD',
+  'wrecker (mercenary)': 'WRECKERS3',
   'omega': 'BADBATCHOMEGA',
   'wrecker': 'BADBATCHWRECKER',
 };
@@ -3625,6 +4032,21 @@ function normalizeGuideSquad(squad){
     memberDefIds.push(memberDefId);
   }
 
+  const validUnitKeys = new Set(
+    [leaderDefId].concat(memberDefIds).map(defIdKey).filter(Boolean)
+  );
+  const requiredTbOmicrons = [];
+  const seenTbOmicrons = new Set();
+  (Array.isArray(source.requiredTbOmicrons) ? source.requiredTbOmicrons : []).forEach(entry=>{
+    const normalized = normalizeGuideTbOmicronRequirement(entry);
+    if(!normalized) return;
+    if(!validUnitKeys.has(defIdKey(normalized.unitDefId))) return;
+    const key = defIdKey(normalized.unitDefId) + '|' + normalizeGuideSkillKey(normalized.skillId);
+    if(seenTbOmicrons.has(key)) return;
+    seenTbOmicrons.add(key);
+    requiredTbOmicrons.push(normalized);
+  });
+
   return {
     ...source,
     id: source.id || (Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)),
@@ -3633,7 +4055,8 @@ function normalizeGuideSquad(squad){
     members,
     memberDefIds,
     notes: String(source.notes || '').trim(),
-    videoUrl: String(source.videoUrl || '').trim(),
+    videoUrl: normalizeExternalUrl(source.videoUrl),
+    requiredTbOmicrons,
     difficulty: source.difficulty || 'auto',
     order: Number.isFinite(source.order) ? source.order : 0,
   };
@@ -4467,6 +4890,48 @@ function showImportStatus(msg,type){
   el.textContent=msg;
 }
 
+function showScanCompleteBanner(done,total,failed){
+  const el = document.getElementById('scan-complete-banner');
+  if(!el) return;
+  const loaded = Math.max(0, Number(done)||0);
+  const members = Math.max(0, Number(total)||0);
+  const misses = Math.max(0, Number(failed)||0);
+  const detail = misses
+    ? loaded+'/'+members+' members were scanned. '+misses+' roster'+(misses===1?' was':'s were')+' not loaded and may need a retry.'
+    : loaded+'/'+members+' members were scanned successfully. Guides, roster checks, operations, and planning now use this scan.';
+  el.innerHTML = '<div class="scan-complete-title">Roster Scan Complete</div>'
+    + '<div class="scan-complete-sub">'+escHtml(detail)+'</div>';
+  el.classList.add('show');
+}
+
+function hideScanCompleteBanner(){
+  const el = document.getElementById('scan-complete-banner');
+  if(!el) return;
+  el.classList.remove('show');
+  el.innerHTML = '';
+}
+
+function setScanButtonState(mode){
+  const btn = document.getElementById('scan-btn');
+  if(!btn) return;
+  btn.classList.remove('btn-scan-loud','btn-scan-repeat');
+  if(mode === 'repeat'){
+    btn.classList.add('btn','btn-scan-repeat');
+    btn.textContent = 'Scan Again?';
+    btn.disabled = false;
+    btn.style.fontSize = '.68rem';
+    btn.style.padding = '7px 14px';
+    btn.style.fontWeight = '700';
+    return;
+  }
+  btn.classList.add('btn','btn-scan-loud');
+  btn.textContent = '⚡ Scan Rosters';
+  btn.disabled = false;
+  btn.style.fontSize = '.68rem';
+  btn.style.padding = '7px 14px';
+  btn.style.fontWeight = '700';
+}
+
 let _primaryAllyCode='';
 
 function extractGuildSummary(data){
@@ -4539,6 +5004,8 @@ function renderGuildSummary(summary, {silent=false, preserveScans=false} = {}){
     rebuildUnitNameIndex();
     const rosterAnalysis = document.getElementById('roster-analysis');
     if(rosterAnalysis) rosterAnalysis.style.display='none';
+    hideScanCompleteBanner();
+    setScanButtonState('primary');
   }
 
   document.getElementById('guild-gp').value = Number(summary.gp) || 0;
@@ -4688,6 +5155,8 @@ async function scanRosters(){
   initRosterTab();
   const rosterAnalysis = document.getElementById('roster-analysis');
   if(rosterAnalysis) rosterAnalysis.style.display='none';
+  hideScanCompleteBanner();
+  setScanButtonState('primary');
   [...document.getElementById('member-grid').querySelectorAll('.member-card')].forEach(card=>{
     card.style.borderColor = 'rgba(93,173,226,0.18)';
   });
@@ -4803,7 +5272,7 @@ async function scanRosters(){
     showImportStatus('Scan cancelled — '+done+' of '+total+' members scanned.','err');
   }
   pb.style.display='none';
-  btn.disabled=false; btn.textContent='Scan Rosters';
+  btn.disabled=false;
   if(!_scanCancelled){
     invalidateOperationsCaches();
     rebuildUnitNameIndex();
@@ -4812,7 +5281,11 @@ async function scanRosters(){
     updateDefaultsFromRosterScan();
     populateMemberDropdown();
     initRosterTab();
+    showScanCompleteBanner(scannedRosterCount() || done, total, failed);
+    setScanButtonState('repeat');
     queueSaveAppState();
+  } else {
+    setScanButtonState('primary');
   }
 }
 
@@ -4848,11 +5321,56 @@ const fmtM=n=>n>=1e9?(n/1e9).toFixed(2)+'B':(n/1e6).toFixed(1)+'M';
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const escHtml=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const guildGP=()=>parseFloat(document.getElementById('guild-gp').value)||400000000;
-const members=()=>parseInt(document.getElementById('guild-members').value)||50;
-const cmBase=()=>parseFloat(document.getElementById('cm-base').value)||70;
-const cmFall=()=>parseFloat(document.getElementById('cm-falloff').value)||10;
-const flBase=()=>parseFloat(document.getElementById('fleet-base').value)||50;
-const flFall=()=>parseFloat(document.getElementById('fleet-falloff').value)||15;
+function parseClampedNumber(value, fallback, minValue, maxValue, asInt=false){
+  const parsed = asInt ? parseInt(value, 10) : parseFloat(value);
+  if(!Number.isFinite(parsed)) return fallback;
+  return clamp(parsed, minValue, maxValue);
+}
+
+function missionEstimateFieldLimit(){
+  return cmMode === 'count' ? 50 : 100;
+}
+
+function sanitizeMissionEstimateInput(id){
+  const input = document.getElementById(id);
+  if(!input) return 0;
+  const fallbackMap = {
+    'cm-base': 70,
+    'cm-falloff': 10,
+    'fleet-base': 50,
+    'fleet-falloff': 15,
+  };
+  const maxValue = missionEstimateFieldLimit();
+  const fallback = Math.min(fallbackMap[id] ?? 0, maxValue);
+  const value = parseClampedNumber(input.value, fallback, 0, maxValue, false);
+  input.min = '0';
+  input.max = String(maxValue);
+  input.value = String(value);
+  return value;
+}
+
+function sanitizeMissionEstimateInputs(){
+  ['cm-base','cm-falloff','fleet-base','fleet-falloff'].forEach(sanitizeMissionEstimateInput);
+}
+
+const members=()=>parseClampedNumber(document.getElementById('guild-members').value,50,1,50,true);
+const cmBase=()=>sanitizeMissionEstimateInput('cm-base');
+const cmFall=()=>sanitizeMissionEstimateInput('cm-falloff');
+const flBase=()=>sanitizeMissionEstimateInput('fleet-base');
+const flFall=()=>sanitizeMissionEstimateInput('fleet-falloff');
+
+function normalizeExternalUrl(rawUrl){
+  const raw = String(rawUrl || '').trim();
+  if(!raw) return '';
+  if(/^(https?:)?\/\//i.test(raw)){
+    return /^https?:\/\//i.test(raw) ? raw : ('https:' + raw);
+  }
+  if(/^(javascript|data|file|vbscript):/i.test(raw)) return '';
+  if(/^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(raw)){
+    return 'https://' + raw;
+  }
+  return raw;
+}
 
 function chainDepth(pid){
   for(const[i,p]of DS_CHAIN.entries())if(p.id===pid)return i;
@@ -4878,14 +5396,20 @@ function calcPlanetPts(pid,day=1){
   const active = activeMemberCount();
   const cmRate = effectiveCmRate(pid);
   const flRate = effectiveFleetRate(pid);
-
-  // CMs: count × expected_completions × pts_per_player
-  const cmCompletions = Math.round(active * cmRate);
-  const cmPts  = p.cms   * cmCompletions  * p.cmPts;
-
-  // Fleet: count × expected_completions × pts_per_player
-  const flCompletions = Math.round(active * flRate);
-  const flPts  = p.fleets * flCompletions * p.fleetPts;
+  const missionMeta = getPlanetMissionEstimateMeta(pid);
+  const fallbackCombatTotal = (p.cms || 0) * (p.cmPts || 0);
+  const fallbackFleetTotal = (p.fleets || 0) * (p.fleetPts || 0);
+  const cmExpected = active * cmRate;
+  const flExpected = active * flRate;
+  const cmCompletions = Math.floor(cmExpected);
+  const cmPartialClear = (cmExpected - cmCompletions) >= 0.5 ? 1 : 0;
+  const flCompletions = Math.round(flExpected);
+  const cmPts = missionMeta.combat.length
+    ? missionMeta.combat.reduce((sum, mission)=>sum + projectCombatMissionPoints(mission, cmExpected), 0)
+    : Math.round(cmExpected) * fallbackCombatTotal;
+  const flPts = missionMeta.fleet.length
+    ? missionMeta.fleet.reduce((sum, mission)=>sum + projectFleetMissionPoints(mission, flExpected), 0)
+    : flCompletions * fallbackFleetTotal;
 
   const opsAvailable = !p.unlockedBy || bonusUnlocked(p.id);
   const projected = opsAvailable ? getProjectedOpsPlanetStats(pid) : null;
@@ -4903,7 +5427,9 @@ function calcPlanetPts(pid,day=1){
   const gpAvail = gpForDay(day);
 
   return {total:cmPts+flPts+opsPts+preload, cmPts, flPts, opsPts, preload,
-          opsFilled, gpAvail, cmCompletions, flCompletions};
+          opsFilled, gpAvail, cmExpected, flExpected, cmCompletions, cmPartialClear, flCompletions,
+          cmMissionCount: missionMeta.combat.length || p.cms || 0,
+          fleetMissionCount: missionMeta.fleet.length || p.fleets || 0};
 }
 function calcStars(pid,day=1){
   const p=ALL_PLANETS.find(x=>x.id===pid);const{total}=calcPlanetPts(pid,day);
@@ -4975,6 +5501,10 @@ function getActiveBonusPlanetIdsFromPlanDays(days){
 
 // SETTINGS
 function onStatsChange(){
+  const guildMembersInput = document.getElementById('guild-members');
+  if(guildMembersInput){
+    guildMembersInput.value = String(parseClampedNumber(guildMembersInput.value, 50, 1, 50, true));
+  }
   invalidateOperationsCaches();
   buildUndepTable();
   calcSummary();
@@ -4985,10 +5515,11 @@ function updateCmModeUi(){
   document.getElementById('mode-pct-btn').classList.toggle('active',cmMode==='pct');
   document.getElementById('mode-count-btn').classList.toggle('active',cmMode==='count');
   const ic=cmMode==='count';
-  document.getElementById('cm-base-label').textContent=ic?'CM wave-2 members':'CM base %';
+  document.getElementById('cm-base-label').textContent=ic?'CM clear members':'CM base %';
   document.getElementById('cm-falloff-label').textContent=ic?'CM falloff (members)':'CM falloff %';
   document.getElementById('fleet-base-label').textContent=ic?'Fleet completions':'Fleet base %';
   document.getElementById('fleet-falloff-label').textContent=ic?'Fleet falloff (members)':'Fleet falloff %';
+  sanitizeMissionEstimateInputs();
 }
 
 function setCmMode(mode){
@@ -4999,7 +5530,7 @@ function setCmMode(mode){
   else{document.getElementById('cm-base').value=70;document.getElementById('cm-falloff').value=10;document.getElementById('fleet-base').value=50;document.getElementById('fleet-falloff').value=15;}
   onFalloffChange();
 }
-function onFalloffChange(){invalidateOperationsCaches();renderFalloffViz();calcSummary();queueSaveAppState();}
+function onFalloffChange(){sanitizeMissionEstimateInputs();invalidateOperationsCaches();renderFalloffViz();calcSummary();queueSaveAppState();}
 function renderFalloffViz(){
   const viz=document.getElementById('fviz');const lblEl=document.getElementById('fviz-labels');
   const ic=cmMode==='count';
@@ -5152,6 +5683,7 @@ function applyPersistedAppState(state, options={}){
     if(settings.cmFalloff != null) document.getElementById('cm-falloff').value = settings.cmFalloff;
     if(settings.fleetBase != null) document.getElementById('fleet-base').value = settings.fleetBase;
     if(settings.fleetFalloff != null) document.getElementById('fleet-falloff').value = settings.fleetFalloff;
+    sanitizeMissionEstimateInputs();
 
     if(Array.isArray(state.dailyUndep)){
       for(let i=0;i<6;i++) dailyUndep[i] = Number(state.dailyUndep[i]) || 0;
@@ -5290,7 +5822,13 @@ function capabilityBadge(pid){
 function buildPlanetCard(p,depth){
   const s=pState[p.id];const m=members();const isBonus=!!p.unlockedBy;
   const unlocked=isBonus?bonusUnlocked(p.id):true;
-  const{total,cmPts,flPts,opsFilled}=calcPlanetPts(p.id,1);
+  const missionMeta = getPlanetMissionEstimateMeta(p.id);
+  const scoringCombatMissions = missionMeta.combat.length ? missionMeta.combat : Array.from({length:p.cms||0},(_,i)=>({label:'CM '+(i+1),points:p.cmPts||0}));
+  const scoringFleetMissions = missionMeta.fleet.length ? missionMeta.fleet : Array.from({length:p.fleets||0},(_,i)=>({label:i===0?'Fleet':'Fleet '+(i+1),points:p.fleetPts||0,type:'fleet'}));
+  const specialGuideMissions = missionMeta.nonPointSpecial;
+  const unlockMission = specialGuideMissions.find(m=>m.unlocks);
+  const regularSpecialMissions = specialGuideMissions.filter(m=>!m.unlocks);
+  const{total,cmPts,flPts,opsFilled,cmExpected,flExpected}=calcPlanetPts(p.id,1);
   const p3=Math.min(100,total/p.stars[2]*100);
   let stars=0;for(let i=0;i<3;i++)if(total>=p.stars[i])stars=i+1;
   const starsHtml=[0,1,2].map(i=>`<span class="star${i<stars?' on':''}">${i<stars?'★':'☆'}</span>`).join('');
@@ -5300,8 +5838,14 @@ function buildPlanetCard(p,depth){
   if(isBonus&&!unlocked)cardClass+=' locked-planet';
   const cmDisp=cmMode==='pct'?(s.cmRateOverride!==null?s.cmRateOverride:Math.round(clamp(cmBase()-cmFall()*depth,0,100))):(s.cmCountOverride!==null?s.cmCountOverride:Math.round(m*clamp((cmBase()-cmFall()*depth)/100,0,1)));
   const flDisp=cmMode==='pct'?(s.fleetRateOverride!==null?s.fleetRateOverride:Math.round(clamp(flBase()-flFall()*depth,0,100))):(s.fleetCountOverride!==null?s.fleetCountOverride:Math.round(m*clamp((flBase()-flFall()*depth)/100,0,1)));
-  const smHtml=p.sms?(p.smUnlocks?`<div class="sm-box"><div class="sm-box-label">${p.smLabel||'Special Mission Unlock'}</div><label class="ops-slot-row" style="align-items:center;gap:10px;cursor:pointer"><input type="checkbox" ${s.smReady?'checked':''} onchange="setSmReady('${p.id}',this.checked)"><span style="font-size:.78rem;color:var(--text)">Plan to unlock ${(p.smUnlocks||'').charAt(0).toUpperCase() + (p.smUnlocks||'').slice(1)} on ${p.name}</span></label><div class="sm-note">${s.smReady?`<span style="color:var(--bonus)">✓ ${(p.smUnlocks||'').charAt(0).toUpperCase() + (p.smUnlocks||'').slice(1)} is enabled for the planner</span>`:'Leave unchecked unless the guild can clear this unlock special mission.'}</div></div>`:`<div class="sm-box"><div class="sm-box-label">${p.smLabel||'Special Mission'}</div><div class="sm-note">Use Guides to track the squad plan for this special mission.</div></div>`):'';
-  const flHtml=p.fleets?`<div class="cm-row"><span class="cm-row-label">Fleet</span><div><div class="mini-label">${cmMode==='pct'?'Comp %':'Comp #'}</div><input class="mini-in" type="number" min="0" max="${cmMode==='pct'?100:m}" value="${flDisp}" oninput="setFleetOv('${p.id}',this.value)"></div><div><div class="mini-label">est pts</div><div class="mini-val">${fmtM(flPts)}</div></div></div>`:'';
+  const specialNames = regularSpecialMissions.map(m=>m.label).join(', ');
+  const smHtml=unlockMission
+    ? `<div class="sm-box"><div class="sm-box-label">${unlockMission.label}</div><label class="ops-slot-row" style="align-items:center;gap:10px;cursor:pointer"><input type="checkbox" ${s.smReady?'checked':''} onchange="setSmReady('${p.id}',this.checked)"><span style="font-size:.78rem;color:var(--text)">Plan to unlock ${(unlockMission.unlocks||'').charAt(0).toUpperCase() + (unlockMission.unlocks||'').slice(1)} on ${p.name}</span></label><div class="sm-note">${s.smReady?`<span style="color:var(--bonus)">✓ ${(unlockMission.unlocks||'').charAt(0).toUpperCase() + (unlockMission.unlocks||'').slice(1)} is enabled for the planner</span>`:'Leave unchecked unless the guild can clear this unlock special mission.'}${specialNames?'<br>Other special missions: '+escHtml(specialNames):''}</div></div>`
+    : (regularSpecialMissions.length
+      ? `<div class="sm-box"><div class="sm-box-label">${regularSpecialMissions.length>1?'Special Missions':'Special Mission'}</div><div class="sm-note">Guide-only missions on this planet: ${escHtml(specialNames)}. These do not add projected territory points.</div></div>`
+      : '');
+  const flHtml=scoringFleetMissions.map((mission, idx)=>`<div class="cm-row" data-est-group="fleet" data-points="${Number(mission.points)||0}" data-points-single="${Number(mission.pointsSingle)||0}"><span class="cm-row-label">${escHtml(mission.label || (idx===0?'Fleet':'Fleet '+(idx+1)))}</span><div><div class="mini-label">${cmMode==='pct'?'Comp %':'Comp #'}</div><input class="mini-in" type="number" min="0" max="${cmMode==='pct'?100:m}" value="${flDisp}" oninput="setFleetOv('${p.id}',this.value)"></div><div><div class="mini-label">est pts</div><div class="mini-val">${fmtM(projectFleetMissionPoints(mission, flExpected))}</div></div></div>`).join('');
+  const combatRows=scoringCombatMissions.map((mission, idx)=>`<div class="cm-row" data-est-group="cm" data-points="${Number(mission.points)||0}" data-points-single="${Number(mission.pointsSingle)||0}"><span class="cm-row-label">${escHtml(mission.label || ('CM '+(idx+1)))}</span><div><div class="mini-label">${cmMode==='pct'?'Clear %':'Clear #'}</div><input class="mini-in" type="number" min="0" max="${cmMode==='pct'?100:m}" value="${cmDisp}" oninput="setCmOv('${p.id}',this.value)"></div><div><div class="mini-label">est pts</div><div class="mini-val">${fmtM(projectCombatMissionPoints(mission, cmExpected))}</div></div></div>`).join('');
   return`<div class="${cardClass}" id="card-${p.id}">
 <div class="pcard-header"><div>
       <div class="pcard-name">${p.name}</div>
@@ -5311,8 +5855,8 @@ function buildPlanetCard(p,depth){
 <div class="pts-row">Est: <b>${fmtM(total)}</b> / ${fmtM(p.stars[2])} <span style="color:var(--text3)">(3★)</span></div>
 <div class="prog-wrap"><div class="prog-fill gold" style="width:${p3.toFixed(1)}%"></div></div>
 <div style="margin-top:10px">
-<div class="msec-head">Combat Missions (${p.cms}) <span></span></div>
-${Array.from({length:p.cms},(_,i)=>`<div class="cm-row"><span class="cm-row-label">CM ${i+1}</span><div><div class="mini-label">${cmMode==='pct'?'W2 %':'W2 #'}</div><input class="mini-in" type="number" min="0" max="${cmMode==='pct'?100:m}" value="${cmDisp}" oninput="setCmOv('${p.id}',this.value)"></div><div><div class="mini-label">est pts</div><div class="mini-val">${fmtM(cmPts/p.cms)}</div></div></div>`).join('')}
+<div class="msec-head">Combat / Special Missions (${scoringCombatMissions.length}) <span></span></div>
+${combatRows}
 ${flHtml}</div>
 ${smHtml}
 <div class="msec-head">Operations <span></span></div>
@@ -5350,11 +5894,23 @@ function rebuildPlannerChains(){
 
 function updateCard(pid){
   const p=ALL_PLANETS.find(x=>x.id===pid);const el=document.getElementById('card-'+pid);if(!el)return;
-  const{total,cmPts,flPts,opsFilled}=calcPlanetPts(pid,1);const p3=Math.min(100,total/p.stars[2]*100);
+  const{total,cmPts,flPts,opsFilled,cmExpected,flExpected}=calcPlanetPts(pid,1);const p3=Math.min(100,total/p.stars[2]*100);
   let stars=0;for(let i=0;i<3;i++)if(total>=p.stars[i])stars=i+1;
   const st=el.querySelector('.stars-row');if(st)st.innerHTML=[0,1,2].map(i=>`<span class="star${i<stars?' on':''}">${i<stars?'★':'☆'}</span>`).join('');
   const pt=el.querySelector('.pts-row');if(pt)pt.innerHTML=`Est: <b>${fmtM(total)}</b> / ${fmtM(p.stars[2])} <span style="color:var(--text3)">(3★)</span>`;
   const pr=el.querySelector('.prog-fill');if(pr)pr.style.width=p3.toFixed(1)+'%';
+  el.querySelectorAll('.cm-row[data-est-group]').forEach(row=>{
+    const points = Number(row.dataset.points || 0);
+    const pointsSingle = Number(row.dataset.pointsSingle || 0);
+    const group = row.dataset.estGroup;
+    const val = row.querySelector('.mini-val');
+    if(!val) return;
+    if(group === 'fleet'){
+      val.textContent = fmtM(projectFleetMissionPoints({points, pointsSingle}, flExpected));
+      return;
+    }
+    val.textContent = fmtM(projectCombatMissionPoints({points, pointsSingle}, cmExpected));
+  });
   const pn=el.querySelector('.pnote');if(pn){const need=stars<3?p.stars[stars]-total:0;pn.className='pnote '+(stars===3?'maxed':'need');pn.textContent=stars===3?'✓ 3 stars achievable':fmt(Math.round(Math.max(0,need)))+' pts needed for '+(stars+1)+'★';}
   const on=el.querySelector('.ops-pts-note');if(on)on.outerHTML=getPlatoonHtml(pid);
   el.className=el.className.replace(/\bs[123]\b/g,'').trim();
@@ -5362,8 +5918,20 @@ function updateCard(pid){
   calcSummary();
   queueSaveAppState();
 }
-function setCmOv(pid,v){if(cmMode==='pct')pState[pid].cmRateOverride=parseFloat(v);else pState[pid].cmCountOverride=parseInt(v);invalidateOperationsCaches();updateCard(pid);}
-function setFleetOv(pid,v){if(cmMode==='pct')pState[pid].fleetRateOverride=parseFloat(v);else pState[pid].fleetCountOverride=parseInt(v);invalidateOperationsCaches();updateCard(pid);}
+function setCmOv(pid,v){
+  const limit = cmMode==='pct' ? 100 : 50;
+  if(cmMode==='pct') pState[pid].cmRateOverride=parseClampedNumber(v,0,0,limit,false);
+  else pState[pid].cmCountOverride=parseClampedNumber(v,0,0,limit,true);
+  invalidateOperationsCaches();
+  updateCard(pid);
+}
+function setFleetOv(pid,v){
+  const limit = cmMode==='pct' ? 100 : 50;
+  if(cmMode==='pct') pState[pid].fleetRateOverride=parseClampedNumber(v,0,0,limit,false);
+  else pState[pid].fleetCountOverride=parseClampedNumber(v,0,0,limit,true);
+  invalidateOperationsCaches();
+  updateCard(pid);
+}
 function setSmReady(pid,checked){pState[pid].smReady=!!checked;invalidateOperationsCaches();updateCard(pid);rebuildPlannerChains();}
 // DAY PLAN OPTIMIZER
 
@@ -5395,12 +5963,17 @@ function missionOnlyPts(pid) {
   const active = activeMemberCount();
   const cmR  = effectiveCmRate(pid);   // fraction of active members who complete each CM
   const flR  = effectiveFleetRate(pid); // fraction of active members who complete fleet
-
-  // CM points: each CM × expected_completions × cmPts_per_player
-  const cmPts = p.cms * Math.round(active * cmR) * p.cmPts;
-
-  // Fleet points: fleet_count × expected_completions × fleetPts_per_player
-  const flPts = p.fleets * Math.round(active * flR) * p.fleetPts;
+  const missionMeta = getPlanetMissionEstimateMeta(pid);
+  const fallbackCombatTotal = (p.cms || 0) * (p.cmPts || 0);
+  const fallbackFleetTotal = (p.fleets || 0) * (p.fleetPts || 0);
+  const cmExpected = active * cmR;
+  const flExpected = active * flR;
+  const cmPts = missionMeta.combat.length
+    ? missionMeta.combat.reduce((sum, mission)=>sum + projectCombatMissionPoints(mission, cmExpected), 0)
+    : Math.round(cmExpected) * fallbackCombatTotal;
+  const flPts = missionMeta.fleet.length
+    ? missionMeta.fleet.reduce((sum, mission)=>sum + projectFleetMissionPoints(mission, flExpected), 0)
+    : Math.round(flExpected) * fallbackFleetTotal;
 
   return cmPts + flPts;
 }
@@ -5838,7 +6411,9 @@ function simulateGenomePlan(genome, detailed=false) {
       const p = OPT_CHAINS[c][st[c].idx];
       const base = bases[c];
       const opsPts = opsPointsByPlanet[p.id] || 0;
+      const missionPts = missionOnlyPts(p.id);
       if(targets[c]===0){
+        const carryInPts = st[c].banked;
         const safeBanked = Math.min(base, p.stars[0]-1);
         st[c].banked = safeBanked;
         chains[c] = {
@@ -5847,9 +6422,12 @@ function simulateGenomePlan(genome, detailed=false) {
           banked:safeBanked,
           tomorrowEst:safeBanked + missionOnlyPts(p.id),
           threshold1star:p.stars[0],
+          carryInPts,
+          missionPts,
           opsPts
         };
       } else {
+        const carryInPts = st[c].banked;
         const gpAlloc = Math.round((gpNeed[c]||0) * ratio);
         const pts = base + gpAlloc;
         const stars = starsAt(p, pts);
@@ -5864,6 +6442,8 @@ function simulateGenomePlan(genome, detailed=false) {
           stars,
           pctOf3,
           preloadAmt:st[c].banked,
+          carryInPts,
+          missionPts,
           opsPts
         };
         if(stars>=1){
@@ -5878,6 +6458,8 @@ function simulateGenomePlan(genome, detailed=false) {
     let spareGP = Math.max(0, gpDay - gpUsed);
     const bonusPlanets = [];
     activeBonusPlanets.forEach(({planet:b, state})=>{
+      const missionPts = missionOnlyPts(b.id);
+      const carryInPts = state.banked;
       const base = state.banked + missionOnlyPts(b.id) + (opsPointsByPlanet[b.id] || 0);
       const gpNeedB = Math.max(0, b.stars[2] - base);
       const gpUsedB = Math.min(spareGP, gpNeedB);
@@ -5890,6 +6472,8 @@ function simulateGenomePlan(genome, detailed=false) {
         planet:b,
         pts,
         stars,
+        carryInPts,
+        missionPts,
         opsPts:(opsPointsByPlanet[b.id] || 0),
         gpDeployed:gpUsedB,
         carryOver,
@@ -6127,6 +6711,31 @@ function simulateGenomeDetailed(genome) {
 }
 
 // ── Main: run selected algorithm(s) and display result ─────────────────────
+function getProjectedPointsBreakdown(entry){
+  const gpPts = Math.max(0, Number(entry?.gpDeployed) || 0);
+  const opsPts = Math.max(0, Number(entry?.opsPts) || 0);
+  const carryInPts = Math.max(0, Number(entry?.carryInPts ?? entry?.preloadAmt) || 0);
+  const totalPts = Math.max(0, Number(entry?.pts ?? entry?.banked) || 0);
+  const missionPts = Math.max(0,
+    Number(entry?.missionPts)
+    || Math.max(0, totalPts - gpPts - opsPts - carryInPts)
+  );
+  return {missionPts, gpPts, opsPts, carryInPts};
+}
+
+function buildProjectedPointsBreakdownHtml(entry){
+  const {missionPts, gpPts, opsPts, carryInPts} = getProjectedPointsBreakdown(entry);
+  const breakdown = '<div class="day-breakdown">'
+    + fmtM(missionPts) + ' pts from combat & fleet missions'
+    + ' || ' + fmtM(gpPts) + ' pts from deployment'
+    + ' || ' + fmtM(opsPts) + ' pts from operations bonuses'
+    + '</div>';
+  const carryNote = carryInPts > 0
+    ? '<div class="day-preload">Includes ' + fmtM(carryInPts) + ' banked from earlier days</div>'
+    : '';
+  return breakdown + carryNote;
+}
+
 function buildMainDayChainCardHtml(chainKey, chainEntry, chainNames){
   if (!chainEntry || chainEntry.status === 'complete') {
     return '<div class="day-chain '+chainKey+'"><div class="day-chain-title">'+chainNames[chainKey]+'</div><div class="day-locked">Complete</div></div>';
@@ -6135,32 +6744,31 @@ function buildMainDayChainCardHtml(chainKey, chainEntry, chainNames){
   let inner = '';
   if (chainEntry.status === 'preload') {
     const tomorrowEst = fmtM(chainEntry.tomorrowEst || chainEntry.banked);
+    const breakdownHtml = buildProjectedPointsBreakdownHtml(chainEntry);
     const capNote = chainEntry.threshold1star
       ? '<div class="day-advance" style="color:var(--text3)">Capped at '
         + fmtM(chainEntry.threshold1star - 1) + ' (1-star threshold: ' + fmtM(chainEntry.threshold1star) + ')</div>'
       : '';
     inner = '<div class="day-stars" style="color:#c39bd3">Preloading</div>'
-      + '<div class="day-action">Banking ' + fmtM(chainEntry.banked) + ' pts</div>'
-      + '<div class="day-advance">Tomorrow est. base: ' + tomorrowEst + '</div>'
+      + '<div class="day-action">Projected total: ' + fmtM(chainEntry.banked) + ' pts</div>'
+      + breakdownHtml
+      + '<div class="day-advance">Banking below 1-star for tomorrow | Tomorrow est. base: ' + tomorrowEst + '</div>'
       + capNote;
   } else if (chainEntry.status === 'commit') {
-    const preloadNote = chainEntry.preloadAmt > 0
-      ? '<div class="day-advance">Incl. ' + fmtM(chainEntry.preloadAmt) + ' banked from preload</div>'
-      : '';
-    const gpNote = chainEntry.gpDeployed > 0 ? ' + ' + fmtM(chainEntry.gpDeployed) + ' GP' : '';
-    const opsNote = chainEntry.opsPts > 0
-      ? '<div class="day-advance" style="color:var(--mx)">Ops contributed ' + fmtM(chainEntry.opsPts) + '</div>'
-      : '';
+    const breakdownHtml = buildProjectedPointsBreakdownHtml(chainEntry);
     const advNote = chainEntry.stars === 3
       ? '<div class="day-advance" style="color:var(--mx)">3-star! Next planet unlocks tomorrow</div>'
       : '<div class="day-advance">' + chainEntry.pctOf3 + '% of 3-star | next planet unlocks tomorrow</div>';
     inner = '<div class="day-stars">' + chainEntry.stars + ' stars</div>'
-      + '<div class="day-action">' + fmtM(chainEntry.pts) + ' pts' + gpNote + '</div>'
-      + advNote + preloadNote + opsNote;
+      + '<div class="day-action">Projected total: ' + fmtM(chainEntry.pts) + ' pts</div>'
+      + breakdownHtml
+      + advNote;
   } else {
+    const breakdownHtml = buildProjectedPointsBreakdownHtml(chainEntry);
     inner = '<div class="day-stars" style="color:var(--ds)">Below 1-star</div>'
-      + '<div class="day-action">' + fmtM(chainEntry.pts) + ' / ' + fmtM(planet.stars[0]) + ' for 1-star</div>'
-      + '<div class="day-advance">Banking ' + fmtM(chainEntry.pts) + ' - needs more GP or preloading</div>';
+      + '<div class="day-action">Projected total: ' + fmtM(chainEntry.pts) + ' pts</div>'
+      + breakdownHtml
+      + '<div class="day-advance">' + fmtM(chainEntry.pts) + ' / ' + fmtM(planet.stars[0]) + ' for 1-star - needs more GP or preloading</div>';
   }
   return '<div class="day-chain '+chainKey+'"><div class="day-chain-title">'+chainNames[chainKey]+'</div>'
     + '<div class="day-planet-name">'+escHtml(planet.name)+'</div>' + inner + '</div>';
@@ -6169,10 +6777,7 @@ function buildMainDayChainCardHtml(chainKey, chainEntry, chainNames){
 function buildBonusDayChainCardHtml(bonusEntry){
   const planet = bonusEntry?.planet;
   if(!planet) return '';
-  const gpNote = bonusEntry.gpDeployed > 0 ? ' + ' + fmtM(bonusEntry.gpDeployed) + ' GP' : '';
-  const opsNote = bonusEntry.opsPts > 0
-    ? '<div class="day-advance" style="color:var(--mx)">Ops contributed ' + fmtM(bonusEntry.opsPts) + '</div>'
-    : '';
+  const breakdownHtml = buildProjectedPointsBreakdownHtml(bonusEntry);
   const sourceName = getPlanetMetaById(planet.unlockedBy)?.name || planet.unlockedBy || 'its unlock planet';
   const unlockNote = bonusEntry.unlockedOnDay
     ? '<div class="day-advance">Unlocked after ' + escHtml(sourceName) + ' hit 1-star on Day ' + bonusEntry.unlockedOnDay + '</div>'
@@ -6180,14 +6785,17 @@ function buildBonusDayChainCardHtml(bonusEntry){
   let inner = '';
   if ((Number(bonusEntry.stars) || 0) >= 1) {
     inner = '<div class="day-stars">' + bonusEntry.stars + ' stars</div>'
-      + '<div class="day-action">' + fmtM(bonusEntry.pts) + ' pts' + gpNote + '</div>'
+      + '<div class="day-action">Projected total: ' + fmtM(bonusEntry.pts) + ' pts</div>'
+      + breakdownHtml
       + '<div class="day-advance" style="color:#c39bd3">Locks tomorrow after earning stars</div>'
-      + unlockNote + opsNote;
+      + unlockNote;
   } else {
     inner = '<div class="day-stars" style="color:#c39bd3">Active</div>'
-      + '<div class="day-action">' + fmtM(bonusEntry.pts) + ' / ' + fmtM(planet.stars[0]) + ' for 1-star' + gpNote + '</div>'
+      + '<div class="day-action">Projected total: ' + fmtM(bonusEntry.pts) + ' pts</div>'
+      + breakdownHtml
       + '<div class="day-advance">Carryover into tomorrow: ' + fmtM(bonusEntry.carryOver || 0) + '</div>'
-      + unlockNote + opsNote;
+      + unlockNote
+      + '<div class="day-advance">' + fmtM(bonusEntry.pts) + ' / ' + fmtM(planet.stars[0]) + ' for 1-star</div>';
   }
   return '<div class="day-chain bonus"><div class="day-chain-title">Bonus Planet</div>'
     + '<div class="day-planet-name">'+escHtml(planet.name)+'</div>' + inner + '</div>';
@@ -7973,7 +8581,7 @@ _EXTRA_UNIT_NAME_MAP = {
     "CASSIANUNDERCOVER":"Cassian Andor (Undercover)",
     "CINTA":"Cinta Kaz",
     "CROSSHAIRS3":"Crosshair (Scarred)",
-    "DARKREY":"Dark Rey",
+    "DARKREY":"Rey (Dark Side Vision)",
     "DEATHTROOPERPERIDEA":"Death Trooper (Peridea)",
     "DEDRAMEERO":"Dedra Meero",
     "DEPABILLABA":"Depa Billaba",
@@ -7999,20 +8607,20 @@ _EXTRA_UNIT_NAME_MAP = {
     "MAZKANATA":"Maz Kanata",
     "MORGANELSBETH":"Morgan Elsbeth",
     "NIGHTTROOPER":"Night Trooper",
-    "OMEGAS3":"Omega",
+    "OMEGAS3":"Omega (Fugitive)",
     "OPERATIVE":"CX-2",
-    "PADAWANSABINE":"Sabine Wren (Padawan)",
+    "PADAWANSABINE":"Padawan Sabine Wren",
     "QUIGGOLD":"Quiggold",
-    "SCORCH":"Scorch",
+    "SCORCH":"RC-1262 \"Scorch\"",
     "SHINHATI":"Shin Hati",
     "SM33":"SM-33",
     "STORMTROOPERLUKE":"Stormtrooper Luke",
     "STRANGER":"The Stranger",
     "VADERDUELSEND":"Darth Vader (Duel's End)",
     "VANE":"Vane",
-    "VANGUARDTEMPLEGUARD":"Vanguard Temple Guard",
+    "VANGUARDTEMPLEGUARD":"Temple Guard",
     "VEL":"Vel Sartha",
-    "WRECKERS3":"Wrecker",
+    "WRECKERS3":"Wrecker (Mercenary)",
     "YODACHEWBACCA":"Yoda & Chewie",
     "ZUCKUSS":"Zuckuss",
 }
@@ -8039,9 +8647,9 @@ _SHIP_NAME_MAP = {
     "FIRSTORDERTIEECHELON":"TIE Echelon",
     "FURYCLASSINTERCEPTOR":"Fury-class Interceptor",
     "GAUNTLETSTARFIGHTER":"Gauntlet Starfighter",
-    "GEONOSIANSTARFIGHTER1":"Geonosian Soldier's Starfighter",
-    "GEONOSIANSTARFIGHTER2":"Geonosian Spy's Starfighter",
-    "GEONOSIANSTARFIGHTER3":"Sun Fac's Geonosian Starfighter",
+    "GEONOSIANSTARFIGHTER1":"Sun Fac's Geonosian Starfighter",
+    "GEONOSIANSTARFIGHTER2":"Geonosian Soldier's Starfighter",
+    "GEONOSIANSTARFIGHTER3":"Geonosian Spy's Starfighter",
     "GHOST":"Ghost",
     "HOUNDSTOOTH":"Hound's Tooth",
     "HYENABOMBER":"Hyena Bomber",
@@ -8096,9 +8704,24 @@ _UNIT_NAME_ALIASES = {
     "mandobeskararmor": "THEMANDALORIANBESKARARMOR",
     "bokatanmandalor": "MANDALORBOKATAN",
     "dtmg": "MOFFGIDEONS3",
+    "darkrey": "DARKREY",
+    "reydarksidevision": "DARKREY",
+    "padmeamidala": "PADMEAMIDALA",
     "bladeofdorin": "BLADEOFDORIN",
+    "plokoonsjedistarfighter": "BLADEOFDORIN",
+    "sunfacsgeonosianstarfighter": "GEONOSIANSTARFIGHTER1",
+    "geonosiansoldiersstarfighter": "GEONOSIANSTARFIGHTER2",
+    "geonosianspysstarfighter": "GEONOSIANSTARFIGHTER3",
     "btlbywingstarfighter": "YWINGCLONEWARS",
     "rebelywing": "YWINGREBEL",
+    "scythe": "SCYTHE",
+    "omegafugitive": "OMEGAS3",
+    "padawansabinewren": "PADAWANSABINE",
+    "sabinewrenpadawan": "PADAWANSABINE",
+    "rc1262scorch": "SCORCH",
+    "templeguard": "VANGUARDTEMPLEGUARD",
+    "vanguardtempleguard": "VANGUARDTEMPLEGUARD",
+    "wreckermercenary": "WRECKERS3",
     "omega": "BADBATCHOMEGA",
     "wrecker": "BADBATCHWRECKER",
 }
@@ -8677,6 +9300,36 @@ def _collect_unit_skill_ids(def_id, combat_type=1):
             for crew_unit_id in _unit_crew_map.get(base_key, []):
                 _push((_unit_skill_reference_map.get(_normalize_loc_key(crew_unit_id), []) or [])[:1])
     return ordered
+
+
+def _build_guide_tb_omicron_map():
+    _ensure_localization_maps(force=not (_skill_meta_map and _unit_skill_reference_map))
+    result = {}
+    tb_omicron_area = 7
+    for unit_id in sorted(_unit_skill_reference_map.keys()):
+        if _infer_combat_type(unit_id, raw_ctype=1) != 1:
+            continue
+        seen = set()
+        skills = []
+        for skill_id in _collect_unit_skill_ids(unit_id, combat_type=1):
+            skill_key = _normalize_loc_key(skill_id)
+            if skill_key in seen:
+                continue
+            seen.add(skill_key)
+            meta = _normalize_skill_meta_entry(_skill_meta_map.get(skill_key, {}))
+            if not meta.get("isOmicron"):
+                continue
+            if int(meta.get("omicronArea") or 0) != tb_omicron_area:
+                continue
+            skills.append({
+                "skillId": skill_id,
+                "name": _lookup_ability_name(skill_id, skill_id),
+                "kind": meta.get("kind") or _infer_skill_kind(skill_id),
+                "omicronArea": tb_omicron_area,
+            })
+        if skills:
+            result[_normalize_loc_key(unit_id)] = skills
+    return result
 
 
 def _populate_gamedata_name_maps(version):
@@ -10094,6 +10747,20 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"status": "unavailable",
                     "error": ("Built-in operations definitions are unavailable. "
                               "Check the terminal window for diagnostic details.")}, 503)
+
+        elif self.path == "/api/guide-tb-omicrons":
+            try:
+                self.send_json({
+                    "status": "ok",
+                    "units": _build_guide_tb_omicron_map(),
+                    "omicronArea": 7,
+                    "areaLabel": "Territory Battles",
+                })
+            except Exception as exc:
+                self.send_json({
+                    "status": "error",
+                    "error": f"Could not load Territory Battle omicron metadata: {exc}",
+                }, 500)
 
         elif self.path == "/api/platoon-analysis":
             rosters = dict(_guild_rosters)

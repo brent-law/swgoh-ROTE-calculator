@@ -1,1 +1,0 @@
-python -m PyInstaller --onefile --name ROTE_Planner rote_planner.py

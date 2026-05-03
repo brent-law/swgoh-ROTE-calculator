@@ -290,12 +290,6 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
 .relic-pip{width:8px;height:8px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2)}
 .relic-pip.r5{background:#8e44ad}.relic-pip.r7{background:var(--gold)}
 /* ── ROSTER ANALYSIS ── */
-.unit-check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:8px}
-.unit-check{background:var(--bg4);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px}
-.unit-check-name{font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:3px}
-.unit-check-stat{font-size:.74rem;color:var(--text2)}
-.unit-check-stat .count{color:var(--gold);font-family:'Orbitron',monospace;font-weight:600}
-.unit-check-stat .count.good{color:var(--mx)}.unit-check-stat .count.warn{color:var(--gold2)}.unit-check-stat .count.bad{color:var(--ds)}
 /* ── SETTINGS GRID ── */
 .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:1.25rem}
 .falloff-viz{display:flex;gap:3px;align-items:flex-end;height:40px}
@@ -544,10 +538,6 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
       </div>
       <div id="scan-complete-banner" class="scan-complete-banner"></div>
       <div class="member-grid" id="member-grid"></div>
-      <div id="roster-analysis" style="display:none;margin-top:12px">
-        <div style="font-size:.72rem;color:var(--text2);margin-bottom:8px">Key ROTE units at Relic 5+ across guild</div>
-        <div class="unit-check-grid" id="unit-check-grid"></div>
-      </div>
     </div>
   </div>
 
@@ -1268,23 +1258,6 @@ function buildMemberReport(ac){
     };
   });
 }
-
-const KEY_UNITS = [
-  {defId:'GRANDINQUISITOR',name:'Grand Inquisitor',relic:5},
-  {defId:'LORDVADER',name:'Lord Vader',relic:5},
-  {defId:'VADER',name:'Darth Vader',relic:5},
-  {defId:'SEVENTHSISTER',name:'Seventh Sister',relic:5},
-  {defId:'THIRDSISTER',name:'Third Sister',relic:5},
-  {defId:'JYNERSO',name:'Jyn Erso',relic:5},
-  {defId:'CASSIANANDOR',name:'Cassian Andor',relic:5},
-  {defId:'K2SO',name:'K-2SO',relic:5},
-  {defId:'MANDALORBOKATAN',name:'Bo-Katan (Mand\'alor)',relic:5},
-  {defId:'THEMANDALORIANBESKARARMOR',name:'The Mandalorian (Beskar Armor)',relic:5},
-  {defId:'JEDIKNIGHTCAL',name:'Jedi Knight Cal Kestis',relic:5},
-  {defId:'CEREJUNDA',name:'Cere Junda',relic:5},
-  {defId:'JABBATHEHUTT',name:'Jabba the Hutt',relic:5},
-  {defId:'FENNECSHAND',name:'Fennec Shand',relic:5},
-];
 
 // Per-planet state
 const pState={};
@@ -4936,7 +4909,7 @@ function setScanButtonState(mode){
   btn.classList.remove('btn-scan-loud','btn-scan-repeat');
   if(mode === 'repeat'){
     btn.classList.add('btn','btn-scan-repeat');
-    btn.textContent = 'Scan Again?';
+    btn.textContent = 'Scan complete. Scan again?';
     btn.disabled = false;
     btn.style.fontSize = '.68rem';
     btn.style.padding = '7px 14px';
@@ -5021,8 +4994,6 @@ function renderGuildSummary(summary, {silent=false, preserveScans=false} = {}){
     _rosterData = [];
     _rosterFiltered = [];
     rebuildUnitNameIndex();
-    const rosterAnalysis = document.getElementById('roster-analysis');
-    if(rosterAnalysis) rosterAnalysis.style.display='none';
     hideScanCompleteBanner();
     setScanButtonState('primary');
   }
@@ -5133,20 +5104,6 @@ function scannedRosterCount(){
   return Object.values(guildRosters).filter(roster=>Array.isArray(roster) && roster.length > 0).length;
 }
 
-function recountKeyUnits(){
-  const counts = {};
-  KEY_UNITS.forEach(unit=>{ counts[normalizeDefId(unit.defId).toUpperCase()] = 0; });
-  Object.values(guildRosters).forEach(roster=>{
-    KEY_UNITS.forEach(unit=>{
-      const found = (roster||[]).find(entry=>unitMatchesDefId(entry, unit.defId));
-      if(found && (Number(found.relic)||0) >= (unit.relic||0)){
-        counts[normalizeDefId(unit.defId).toUpperCase()]++;
-      }
-    });
-  });
-  return counts;
-}
-
 let _scanCancelled = false;
 function cancelScan(btn){ _scanCancelled=true; if(btn) btn.textContent='Stopping...'; }
 
@@ -5172,8 +5129,6 @@ async function scanRosters(){
   updateOperationsTabVisibility();
   populateMemberDropdown();
   initRosterTab();
-  const rosterAnalysis = document.getElementById('roster-analysis');
-  if(rosterAnalysis) rosterAnalysis.style.display='none';
   hideScanCompleteBanner();
   setScanButtonState('primary');
   [...document.getElementById('member-grid').querySelectorAll('.member-card')].forEach(card=>{
@@ -5197,8 +5152,6 @@ async function scanRosters(){
   const pbt = document.getElementById('scan-pb-text');
   btn.disabled=true; btn.textContent='Scanning...';
   showImportStatus('Starting a fresh roster scan for '+total+' members...','loading');
-  const unitCounts = {};
-  KEY_UNITS.forEach(u=>unitCounts[normalizeDefId(u.defId).toUpperCase()]=0);
 
   // Sequential with retry + comlink health monitoring
   // Sequential avoids overwhelming comlink; retry handles transient failures
@@ -5263,10 +5216,6 @@ async function scanRosters(){
     if(data && data.roster && data.roster.length > 0){
       const normalizedRoster = data.roster.map(normalizeRosterUnit);
       guildRosters[ac] = normalizedRoster;
-      KEY_UNITS.forEach(u=>{
-        const unit=normalizedRoster.find(x=>unitMatchesDefId(x, u.defId));
-        if(unit&&(Number(unit.relic)||0)>=(u.relic||0)) unitCounts[normalizeDefId(u.defId).toUpperCase()]++;
-      });
       if(cards[i]) cards[i].style.borderColor='rgba(39,174,96,0.4)';
       consecFails = 0;
     } else {
@@ -5293,16 +5242,22 @@ async function scanRosters(){
   pb.style.display='none';
   btn.disabled=false;
   if(!_scanCancelled){
-    invalidateOperationsCaches();
-    rebuildUnitNameIndex();
-    refreshGuideUnitLinks();
-    renderRosterAnalysis(unitCounts, scannedRosterCount() || done);
-    updateDefaultsFromRosterScan();
-    populateMemberDropdown();
-    initRosterTab();
-    showScanCompleteBanner(scannedRosterCount() || done, total, failed);
     setScanButtonState('repeat');
-    queueSaveAppState();
+    const loadedCount = scannedRosterCount() || done;
+    showScanCompleteBanner(loadedCount, total, failed);
+    try{
+      invalidateOperationsCaches();
+      rebuildUnitNameIndex();
+      refreshGuideUnitLinks();
+      updateDefaultsFromRosterScan();
+      populateMemberDropdown();
+      initRosterTab();
+    }catch(err){
+      console.error('[ROTE] Post-scan refresh failed:', err);
+      showImportStatus('Roster scan completed, but some views failed to refresh: '+err.message, 'err');
+    }finally{
+      queueSaveAppState();
+    }
   } else {
     setScanButtonState('primary');
   }
@@ -5321,17 +5276,6 @@ function updateDefaultsFromRosterScan(){
     pState[p.id].fleetRateOverride=Math.round(Math.min(rate*0.85,100));
   });
   if(document.getElementById('chain-ds').innerHTML) rebuildPlannerChains();
-}
-
-function renderRosterAnalysis(counts,total){
-  const grid=document.getElementById('unit-check-grid');
-  grid.innerHTML=KEY_UNITS.map(u=>{
-    const c=counts[normalizeDefId(u.defId).toUpperCase()]||0;
-    const cls=c>=total*0.8?'good':c>=total*0.5?'warn':'bad';
-    const pct=total?Math.round(c/total*100):0;
-    return `<div class="unit-check"><div class="unit-check-name">${escHtml(u.name)}</div><div class="unit-check-stat"><span class="count ${cls}">${c}/${total}</span> at R${u.relic}+ (${pct}%)</div></div>`;
-  }).join('');
-  document.getElementById('roster-analysis').style.display='block';
 }
 
 // UTILS
@@ -5753,9 +5697,6 @@ function applyPersistedAppState(state, options={}){
     renderFalloffViz();
     refreshGuideUnitLinks();
 
-    if(allowVolatile && scannedRosterCount() > 0){
-      renderRosterAnalysis(recountKeyUnits(), scannedRosterCount());
-    }
     populateMemberDropdown();
     initRosterTab();
 

@@ -8,6 +8,7 @@ Rise of the Empire Territory Battle planner for Star Wars: Galaxy of Heroes.
 - `rote_ops_fallback.py`
 - `ROTE_Planner.spec`
 - `ROTE_TB_PLANNER_PROJECT_STATE.txt`
+- `ROTE_manual_mission_confirmations_2026-05-01.md`
 - `requirements.txt`
 - `build_command.txt`
 
@@ -16,6 +17,7 @@ Rise of the Empire Territory Battle planner for Star Wars: Galaxy of Heroes.
 - Launches a local web app for planning Rise of the Empire Territory Battles
 - Uses `swgoh-comlink` for live guild import and roster scanning
 - Uses bundled wiki-based Operations definitions for ROTE platoons
+- Uses the manually confirmed mission-definition reference to keep guide and planner mission data aligned
 - Exports day-by-day plans and Operations into print-friendly PDF views
 - Supports full-plan overview exports with compact daily estimation summaries
 - Supports detailed or condensed Operations export layouts for sharing
@@ -50,6 +52,7 @@ dist\ROTE_Planner.exe
 ## Runtime Notes
 
 - The app downloads `swgoh-comlink` automatically into a local `.comlink` folder on first run.
+- `ROTE_manual_mission_confirmations_2026-05-01.md` is the current manual reference for confirmed mission structure and requirements.
 - Operations assignments appear after fetching a guild, scanning rosters, and running the optimizer.
 - The Operations view includes missing-unit shortfall summaries for impossible platoons and planet-level blockers.
 - PDF export supports one combined document or separate day-by-day export windows.

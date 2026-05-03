@@ -1,0 +1,6 @@
+.comlink/
+build/
+dist/
+__pycache__/
+*.pyc
+rote_planner_startup.log

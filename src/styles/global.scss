@@ -1,0 +1,85 @@
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap");
+
+:root {
+  font-family: "Rajdhani", "Segoe UI", sans-serif;
+  color: #e8eaf0;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+
+  --planner-bg: #080c14;
+  --planner-bg-2: #0d1220;
+  --planner-bg-3: #111827;
+  --planner-bg-4: #1a2236;
+  --planner-ds: #c0392b;
+  --planner-ds-dim: #5c1a14;
+  --planner-mx: #27ae60;
+  --planner-mx-dim: #0d4a22;
+  --planner-ls: #2980b9;
+  --planner-ls-dim: #0d2e4a;
+  --planner-bonus: #8e44ad;
+  --planner-bonus-dim: #3b1a5e;
+  --planner-gold: #f0c040;
+  --planner-gold-2: #c8a020;
+  --planner-silver: #a0aab4;
+  --planner-text: #e8eaf0;
+  --planner-text-2: #c4d2e5;
+  --planner-text-3: #a8bbd3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--planner-text);
+  background:
+    radial-gradient(ellipse at 15% 50%, rgba(192, 57, 43, 0.05) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 50%, rgba(41, 128, 185, 0.05) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 5%, rgba(39, 174, 96, 0.04) 0%, transparent 45%),
+    var(--planner-bg);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.02), transparent 45%),
+    linear-gradient(225deg, rgba(255, 255, 255, 0.03), transparent 40%);
+  z-index: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(240, 192, 64, 0.45);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(240, 192, 64, 0.22);
+  color: var(--planner-text);
+}

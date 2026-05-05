@@ -1,0 +1,2062 @@
+.shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.header {
+  position: relative;
+  z-index: 2;
+  padding: 1.5rem 2rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.headerTopRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.appTitle {
+  margin: 0;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--planner-gold);
+  text-shadow: 0 0 24px rgba(240, 192, 64, 0.35);
+}
+
+.subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.84rem;
+  color: var(--planner-text-2);
+  letter-spacing: 0.05em;
+}
+
+.comlinkPanel {
+  padding-top: 0.25rem;
+  text-align: right;
+}
+
+.comlinkLabel {
+  font-size: 0.68rem;
+  color: var(--planner-text-2);
+}
+
+.comlinkRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.comlinkStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+}
+
+.comlinkMeta,
+.comlinkMessage {
+  margin-top: 0.3rem;
+  max-width: 22rem;
+  font-size: 0.68rem;
+  color: var(--planner-text-3);
+  line-height: 1.45;
+}
+
+.comlinkMessage {
+  color: #ffb3ac;
+}
+
+.statusDot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--planner-text-3);
+}
+
+.statusOnline {
+  background: var(--planner-mx);
+}
+
+.statusOffline {
+  background: var(--planner-ds);
+}
+
+.navTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-top: 1.25rem;
+}
+
+.navTab {
+  padding: 0.55rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-bottom: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background: transparent;
+  color: var(--planner-text-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+.navTab:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--planner-text);
+}
+
+.navTabActive {
+  background: var(--planner-bg-3);
+  border-color: rgba(240, 192, 64, 0.4);
+  color: var(--planner-gold);
+}
+
+.main {
+  position: relative;
+  z-index: 1;
+  padding: 1.5rem 2rem 2rem;
+}
+
+.panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.panelCard,
+.metricCard,
+.planetCard,
+.dayBlock,
+.stageCard,
+.missionPanel,
+.squadCard,
+.modalCard,
+.rosterSection,
+.emptyStateCard {
+  background: var(--planner-bg-3);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.9rem;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+}
+
+.panelCard,
+.stageCard,
+.missionPanel,
+.rosterSection,
+.emptyStateCard {
+  padding: 1.25rem;
+}
+
+.cardTitle,
+.stageTitle,
+.missionPanelTitle,
+.modalTitle {
+  margin: 0 0 0.9rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: var(--planner-text-2);
+  text-transform: uppercase;
+}
+
+.cardSubtitle,
+.missionPanelCopy,
+.warningCopy,
+.warningNote,
+.stageSubtitle,
+.fieldHint,
+.noteText,
+.summaryText {
+  color: var(--planner-text-2);
+  line-height: 1.55;
+}
+
+.field,
+.modalField {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.label {
+  font-size: 0.78rem;
+  color: var(--planner-text-2);
+  letter-spacing: 0.04em;
+}
+
+.input,
+.modalInput,
+.selectControl,
+.searchInput,
+.tableInput {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 0.5rem;
+  background: var(--planner-bg-4);
+  color: var(--planner-text);
+  font: inherit;
+}
+
+.readOnlyInput {
+  color: var(--planner-text-2);
+  cursor: default;
+}
+
+.modalInput {
+  resize: vertical;
+}
+
+.retryButton,
+.secondaryButton,
+.toggleButton,
+.difficultyButton,
+.sortButton,
+.chainButton,
+.linkButton {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: transparent;
+  color: var(--planner-text-2);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.retryButton,
+.secondaryButton {
+  padding: 0.35rem 0.85rem;
+  border-radius: 0.45rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+
+.primaryButton,
+.scanButton {
+  border: 1px solid var(--planner-gold-2);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--planner-gold);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.primaryButton {
+  padding: 0.6rem 1.1rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.primaryButton:disabled,
+.scanButton:disabled,
+.secondaryButton:disabled,
+.selectControl:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.primaryButton:hover,
+.retryButton:hover,
+.secondaryButton:hover,
+.chainButton:hover,
+.toggleButton:hover,
+.difficultyButton:hover,
+.sortButton:hover,
+.linkButton:hover {
+  border-color: var(--planner-text-2);
+  color: var(--planner-text);
+}
+
+.scanButton {
+  position: relative;
+  padding: 0.5rem 0.9rem;
+  color: #ecfff6;
+  background: linear-gradient(135deg, rgba(18, 122, 76, 0.95), rgba(30, 186, 116, 0.98));
+  border-color: #36f3a2;
+  box-shadow:
+    0 0 0 1px rgba(54, 243, 162, 0.24),
+    0 0 18px rgba(54, 243, 162, 0.42),
+    0 0 38px rgba(54, 243, 162, 0.22);
+}
+
+.scanButton:hover,
+.primaryButton:hover {
+  background: var(--planner-gold);
+  color: var(--planner-bg);
+  border-color: var(--planner-gold);
+}
+
+.importBanner {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid rgba(240, 192, 64, 0.2);
+  border-radius: 0.9rem;
+  background: rgba(240, 192, 64, 0.06);
+}
+
+.importIcon {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 1rem;
+  color: var(--planner-gold);
+}
+
+.importText h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.92rem;
+  color: var(--planner-gold);
+}
+
+.importText p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--planner-text-2);
+  line-height: 1.55;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: end;
+}
+
+.statusBar {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(70, 210, 140, 0.32);
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgba(18, 76, 55, 0.88), rgba(26, 108, 72, 0.82));
+  color: #edf9f1;
+  font-size: 0.78rem;
+}
+
+.memberToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.memberHeading {
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.memberSubheading {
+  font-size: 0.72rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  color: var(--planner-text-2);
+}
+
+.memberGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.memberCard {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.5rem;
+  background: var(--planner-bg-4);
+}
+
+.memberName {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.memberGp {
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  color: var(--planner-text-2);
+}
+
+.relicBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  margin-top: 0.3rem;
+}
+
+.relicPip {
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  background: var(--planner-bg-3);
+}
+
+.relicPipR5 {
+  background: #8e44ad;
+}
+
+.relicPipR7 {
+  background: var(--planner-gold);
+}
+
+.settingsGrid,
+.metricGrid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.settingsGrid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.metricGrid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.metricCard {
+  padding: 0.85rem 1rem;
+}
+
+.metricLabel {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--planner-text-2);
+  text-transform: uppercase;
+}
+
+.metricValue,
+.dayPickerPoints {
+  margin-top: 0.3rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 1.15rem;
+  color: var(--planner-text);
+}
+
+.metricValueGold {
+  color: var(--planner-gold);
+}
+
+.metricValueGreen {
+  color: var(--planner-mx);
+}
+
+.metricValuePurple {
+  color: #c39bd3;
+}
+
+.toggleGroup {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+}
+
+.toggleButton {
+  padding: 0.3rem 0.8rem;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.13);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.toggleButton:last-child {
+  border-right: 0;
+}
+
+.toggleButtonActive {
+  background: var(--planner-gold);
+  color: var(--planner-bg);
+}
+
+.twoColumnGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.85rem;
+}
+
+.vizTitle {
+  margin: 0.7rem 0 0.35rem;
+  font-size: 0.62rem;
+  color: var(--planner-text-3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.falloffViz {
+  display: flex;
+  align-items: end;
+  gap: 0.2rem;
+  height: 3rem;
+}
+
+.falloffVizDetailed {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+
+.falloffZone {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  padding-left: 0.25rem;
+  border-left: 2px solid transparent;
+}
+
+.falloffBars {
+  display: flex;
+  gap: 0.15rem;
+  align-items: end;
+  height: 2.8rem;
+}
+
+.falloffBar {
+  flex: 1;
+  border-radius: 0.2rem 0.2rem 0 0;
+}
+
+.falloffBarCm {
+  background: var(--planner-gold);
+  opacity: 0.85;
+}
+
+.falloffBarFleet {
+  background: var(--planner-ls);
+  opacity: 0.72;
+}
+
+.falloffZoneLabel {
+  margin-top: 0.18rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.falloffValueCm,
+.falloffValueFleet {
+  font-size: 0.6rem;
+  text-align: center;
+}
+
+.falloffValueCm {
+  color: var(--planner-gold);
+}
+
+.falloffValueFleet {
+  color: var(--planner-ls);
+}
+
+.vizLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: center;
+  margin-top: 0.45rem;
+  font-size: 0.62rem;
+  color: var(--planner-text-3);
+}
+
+.vizLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.vizLegendSwatch {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 0.12rem;
+}
+
+.vizLegendSwatchCm {
+  background: var(--planner-gold);
+}
+
+.vizLegendSwatchFleet {
+  background: var(--planner-ls);
+}
+
+.vizLegendHint {
+  color: var(--planner-text-3);
+}
+
+.vizBar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: end;
+  justify-content: center;
+  padding-bottom: 0.15rem;
+  border-radius: 0.35rem 0.35rem 0 0;
+  background: linear-gradient(180deg, rgba(240, 192, 64, 0.8), rgba(200, 160, 32, 0.45));
+  color: var(--planner-bg);
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.fullButton {
+  width: 100%;
+  margin-top: 0.9rem;
+}
+
+.inlineStatus {
+  min-height: 1rem;
+  margin-top: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--planner-mx);
+  text-align: center;
+}
+
+.dailyTable {
+  width: 100%;
+  margin-top: 0.75rem;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.dailyTable th,
+.dailyTable td {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  text-align: left;
+}
+
+.dailyTable th {
+  font-size: 0.69rem;
+  letter-spacing: 0.08em;
+  color: var(--planner-text-2);
+  text-transform: uppercase;
+}
+
+.tableInput {
+  padding: 0.25rem 0.4rem;
+  text-align: center;
+}
+
+.plannerToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chainSelect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chainButton {
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.chainButtonDsActive {
+  border-color: var(--planner-ds);
+  background: rgba(192, 57, 43, 0.15);
+  color: var(--planner-ds);
+}
+
+.chainButtonMxActive {
+  border-color: var(--planner-mx);
+  background: rgba(39, 174, 96, 0.15);
+  color: var(--planner-mx);
+}
+
+.chainButtonLsActive {
+  border-color: var(--planner-ls);
+  background: rgba(41, 128, 185, 0.15);
+  color: var(--planner-ls);
+}
+
+.chainStack {
+  display: grid;
+  gap: 0;
+}
+
+.planetRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.chainColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 1.75rem;
+  flex-shrink: 0;
+  padding-top: 1rem;
+}
+
+.chainSegment {
+  width: 0.15rem;
+  min-height: 2rem;
+  flex: 1;
+}
+
+.chainSegmentDs {
+  background: linear-gradient(to bottom, var(--planner-ds), var(--planner-ds-dim));
+}
+
+.chainSegmentMx {
+  background: linear-gradient(to bottom, var(--planner-mx), var(--planner-mx-dim));
+}
+
+.chainSegmentLs {
+  background: linear-gradient(to bottom, var(--planner-ls), var(--planner-ls-dim));
+}
+
+.chainSegmentBonus {
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--planner-bonus) 0,
+    var(--planner-bonus) 0.3rem,
+    transparent 0.3rem,
+    transparent 0.6rem
+  );
+}
+
+.chainDot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border: 2px solid;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.chainDotDs {
+  border-color: var(--planner-ds);
+  background: var(--planner-ds-dim);
+}
+
+.chainDotMx {
+  border-color: var(--planner-mx);
+  background: var(--planner-mx-dim);
+}
+
+.chainDotLs {
+  border-color: var(--planner-ls);
+  background: var(--planner-ls-dim);
+}
+
+.bonusConnector {
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-self: center;
+  border-top: 2px dashed var(--planner-bonus);
+}
+
+.planetCard {
+  flex: 1;
+  min-width: 0;
+  padding: 1rem;
+  margin-bottom: 0.7rem;
+}
+
+.planetCardDs {
+  border-color: var(--planner-ds-dim);
+}
+
+.planetCardMx {
+  border-color: var(--planner-mx-dim);
+}
+
+.planetCardLs {
+  border-color: var(--planner-ls-dim);
+}
+
+.planetCardBonus {
+  border-color: var(--planner-bonus-dim);
+  border-style: dashed;
+}
+
+.planetCardS3 {
+  box-shadow: inset 0 0 0 1px rgba(240, 192, 64, 0.08);
+}
+
+.planetCardS2 {
+  border-color: var(--planner-gold-2);
+}
+
+.planetCardS1 {
+  border-color: var(--planner-silver);
+}
+
+.planetCardLocked {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.planetHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
+  margin-bottom: 0.5rem;
+}
+
+.planetName,
+.stageTitle,
+.dayTitle,
+.dayPickerTitle,
+.planetPillName,
+.squadCardTitle,
+.platoonTitle {
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  letter-spacing: 0.06em;
+}
+
+.planetName {
+  font-size: 0.74rem;
+}
+
+.planetCapability,
+.dayPickerSub,
+.planetPillMeta,
+.slotMeta,
+.platoonSub,
+.dayChainBreakdown,
+.dayChainAdvance {
+  font-size: 0.72rem;
+  color: var(--planner-text-3);
+  line-height: 1.45;
+}
+
+.alignBadge {
+  padding: 0.15rem 0.55rem;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.alignBadgeDs {
+  border-color: var(--planner-ds-dim);
+  background: rgba(192, 57, 43, 0.15);
+  color: var(--planner-ds);
+}
+
+.alignBadgeMx {
+  border-color: var(--planner-mx-dim);
+  background: rgba(39, 174, 96, 0.15);
+  color: var(--planner-mx);
+}
+
+.alignBadgeLs {
+  border-color: var(--planner-ls-dim);
+  background: rgba(41, 128, 185, 0.15);
+  color: var(--planner-ls);
+}
+
+.alignBadgeBonus {
+  border-color: var(--planner-bonus-dim);
+  background: rgba(142, 68, 173, 0.16);
+  color: #c39bd3;
+}
+
+.alignBadgeBonusLocked {
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(74, 85, 104, 0.2);
+  color: var(--planner-text-3);
+}
+
+.starsRow {
+  display: flex;
+  gap: 0.2rem;
+  margin-bottom: 0.4rem;
+}
+
+.star {
+  font-size: 0.7rem;
+  color: var(--planner-text-3);
+}
+
+.starActive {
+  color: var(--planner-gold);
+}
+
+.pointsRow {
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--planner-text-2);
+}
+
+.progressBar {
+  height: 0.2rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--planner-bg-4);
+}
+
+.progressFill,
+.progressFillBg {
+  height: 100%;
+  background: var(--planner-gold);
+}
+
+.missionSection {
+  margin-top: 0.8rem;
+}
+
+.missionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--planner-text-3);
+  text-transform: uppercase;
+}
+
+.missionEstimateRow {
+  display: grid;
+  grid-template-columns: 5rem 1fr 1fr;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+  font-size: 0.74rem;
+}
+
+.miniLabel {
+  margin-bottom: 0.1rem;
+  font-size: 0.64rem;
+  color: var(--planner-text-3);
+  text-align: center;
+}
+
+.miniValue {
+  font-size: 0.72rem;
+  color: var(--planner-text-2);
+  text-align: center;
+}
+
+.operationsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.operationsPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 0.25rem;
+  background: var(--planner-bg-4);
+  color: var(--planner-text-3);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.operationsPillOn {
+  background: var(--planner-gold);
+  border-color: var(--planner-gold);
+  color: var(--planner-bg);
+}
+
+.planetNote {
+  margin-top: 0.45rem;
+  font-size: 0.72rem;
+  color: var(--planner-text-3);
+}
+
+.warningCard {
+  border-color: rgba(240, 192, 64, 0.2);
+  background: rgba(240, 192, 64, 0.06);
+}
+
+.warningCardConfirmed {
+  border-color: rgba(39, 174, 96, 0.22);
+  background: rgba(39, 174, 96, 0.07);
+}
+
+.warningHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.warningNote {
+  margin-top: 0.45rem;
+  color: var(--planner-gold);
+  font-size: 0.72rem;
+}
+
+.algorithmGrid,
+.dayChainsGrid,
+.platoonGrid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.algorithmGrid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 1rem;
+}
+
+.algorithmCard {
+  padding: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.algorithmCardLocked {
+  opacity: 0.55;
+}
+
+.algorithmTitle {
+  margin-bottom: 0.35rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.algorithmDescription {
+  min-height: 4rem;
+  font-size: 0.76rem;
+  color: var(--planner-text-2);
+  line-height: 1.5;
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.badge {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.badgeQuality {
+  border-color: rgba(39, 174, 96, 0.28);
+  color: var(--planner-mx);
+}
+
+.badgeComplexity {
+  border-color: rgba(240, 192, 64, 0.28);
+  color: var(--planner-gold);
+}
+
+.badgeRuntime {
+  border-color: rgba(41, 128, 185, 0.28);
+  color: #7fb6de;
+}
+
+.controlsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.progressButtonWrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid var(--planner-gold-2);
+  min-height: 3rem;
+}
+
+.progressFillBg {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  opacity: 0.22;
+  pointer-events: none;
+  transition: width 0.12s ease;
+}
+
+.progressActionButton {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+.statusLine {
+  font-size: 0.72rem;
+  color: var(--planner-text-3);
+  text-align: center;
+}
+
+.algorithmScoreGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.algorithmScoreCard {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.algorithmScoreCardBest {
+  border-color: rgba(240, 192, 64, 0.36);
+  background: rgba(240, 192, 64, 0.08);
+}
+
+.algorithmScoreLabel {
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--planner-text-2);
+}
+
+.algorithmScoreValue {
+  margin-top: 0.3rem;
+  font-size: 0.95rem;
+  color: var(--planner-gold);
+}
+
+.dayBlock {
+  padding: 1rem;
+}
+
+.dayBlockHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.dayMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.72rem;
+  color: var(--planner-text-2);
+}
+
+.dayChainsGrid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.dayChain {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.dayChainDs {
+  border: 1px solid var(--planner-ds-dim);
+  background: rgba(192, 57, 43, 0.15);
+}
+
+.dayChainMx {
+  border: 1px solid var(--planner-mx-dim);
+  background: rgba(39, 174, 96, 0.15);
+}
+
+.dayChainLs {
+  border: 1px solid var(--planner-ls-dim);
+  background: rgba(41, 128, 185, 0.15);
+}
+
+.dayChainBonus {
+  border: 1px solid var(--planner-bonus-dim);
+  background: rgba(142, 68, 173, 0.16);
+}
+
+.dayChainTitle {
+  margin-bottom: 0.3rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.dayChainPlanet {
+  margin-bottom: 0.15rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.72rem;
+}
+
+.dayChainStars {
+  margin-bottom: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--planner-gold);
+}
+
+.dayChainAction {
+  font-size: 0.74rem;
+  color: var(--planner-text-2);
+  line-height: 1.45;
+}
+
+.notesBlock {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.noteLine {
+  padding: 0.15rem 0;
+  font-size: 0.75rem;
+  color: var(--planner-text-2);
+}
+
+.noteLineBonus {
+  color: #c39bd3;
+}
+
+.noteLineSuccess {
+  color: var(--planner-mx);
+}
+
+.opsLayout,
+.guideLayout {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.opsLayout {
+  grid-template-columns: minmax(260px, 320px) 1fr;
+}
+
+.opsSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.dayPickerCard,
+.planetPill,
+.guidePlanetHeader,
+.guideMissionItem {
+  text-align: left;
+  cursor: pointer;
+}
+
+.dayPickerCard {
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.9rem;
+  background: var(--planner-bg-3);
+}
+
+.dayPickerCardActive {
+  border-color: rgba(240, 192, 64, 0.45);
+  box-shadow: 0 0 0 1px rgba(240, 192, 64, 0.12);
+}
+
+.dayPickerHead,
+.stageHead,
+.missionPanelHero,
+.squadCardHeader,
+.modalHeader,
+.guideTopBar,
+.rosterTopBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.dayPickerKicker,
+.platoonBadge,
+.phaseHeader,
+.missionTypeBadge,
+.sortStaticLabel,
+.guidePlanetCount {
+  min-width: 1.2rem;
+  text-align: right;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--planner-gold);
+}
+
+.opsMainPane {
+  min-width: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.planetStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.65rem;
+}
+
+.planetPill {
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.9rem;
+  background: var(--planner-bg-3);
+}
+
+.planetPillActive {
+  border-color: rgba(240, 192, 64, 0.45);
+  box-shadow: 0 0 0 1px rgba(240, 192, 64, 0.12);
+}
+
+.planetPillToday {
+  margin-top: 0.45rem;
+  font-size: 0.74rem;
+  color: var(--planner-text-2);
+}
+
+.stageMeta {
+  max-width: 16rem;
+  font-size: 0.72rem;
+  color: var(--planner-text-2);
+  text-align: right;
+  line-height: 1.55;
+}
+
+.platoonGrid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.platoonHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
+  margin-bottom: 0.7rem;
+}
+
+.platoonCard {
+  padding: 0.85rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.platoonCardComplete {
+  border: 1px solid var(--planner-mx);
+}
+
+.platoonCardPartial {
+  border: 1px solid #3498db;
+  background: rgba(41, 128, 185, 0.08);
+}
+
+.platoonCardImpossible {
+  border: 1px solid var(--planner-ds);
+  background: rgba(192, 57, 43, 0.08);
+}
+
+.platoonCardReady {
+  border: 1px solid var(--planner-gold-2);
+}
+
+.slotList {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.slotCard {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.slotName,
+.readinessText {
+  font-size: 0.75rem;
+  color: var(--planner-text);
+}
+
+.slotAssignee {
+  margin-top: 0.2rem;
+  font-size: 0.74rem;
+  color: var(--planner-gold);
+}
+
+.slotAssigneeUnassigned {
+  color: var(--planner-text-3);
+}
+
+.missingCard {
+  margin-top: 0.85rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed rgba(192, 57, 43, 0.4);
+  border-radius: 0.9rem;
+  background: rgba(192, 57, 43, 0.06);
+}
+
+.missingTitle {
+  margin-bottom: 0.4rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: #ffb3ac;
+  text-transform: uppercase;
+}
+
+.missingLine {
+  font-size: 0.75rem;
+  color: var(--planner-text-2);
+  line-height: 1.5;
+}
+
+.guideTopBar {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.guideStatusLine {
+  margin-top: -0.35rem;
+  font-size: 0.74rem;
+  color: var(--planner-text-2);
+}
+
+.actionRow,
+.searchRow,
+.inlineField,
+.difficultyRow,
+.modalFooter {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.inlineField {
+  min-width: min(100%, 24rem);
+  flex: 1;
+}
+
+.guideLayout {
+  grid-template-columns: 260px 1fr;
+  min-height: 32rem;
+}
+
+.guideSidebar {
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.phaseHeader {
+  padding: 0.4rem 0.65rem 0.2rem;
+  color: var(--planner-text-2);
+}
+
+.guidePlanetHeader,
+.guideMissionItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--planner-text);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.guidePlanetHeader {
+  justify-content: space-between;
+  padding: 0.45rem 0.65rem;
+  border-left: 3px solid transparent;
+}
+
+.guidePlanetHeader:hover,
+.guideMissionItem:hover {
+  background: var(--planner-bg-4);
+}
+
+.guidePlanetHeaderActive {
+  border-left-color: var(--planner-gold-2);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.guidePlanetName {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--planner-text);
+}
+
+.guidePlanetNameDs {
+  color: var(--planner-ds);
+}
+
+.guidePlanetNameMx {
+  color: var(--planner-mx);
+}
+
+.guidePlanetNameLs {
+  color: var(--planner-ls);
+}
+
+.guidePlanetNameBonus {
+  font-style: italic;
+  color: #d8b9ff;
+}
+
+.guideMissionItem {
+  gap: 0.45rem;
+  padding: 0.35rem 0.65rem 0.35rem 1.35rem;
+}
+
+.guideMissionItemActive {
+  border-left: 3px solid var(--planner-gold-2);
+  background: var(--planner-bg-4);
+}
+
+.guideMissionLabel {
+  flex: 1;
+  min-width: 0;
+  color: var(--planner-text);
+  font-size: 0.76rem;
+}
+
+.missionTypeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.8rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.missionTypeBadgeCombat {
+  color: var(--planner-text-2);
+  border-color: rgba(255, 255, 255, 0.13);
+}
+
+.missionTypeBadgeFleet {
+  color: #7fb6de;
+  border-color: rgba(95, 173, 226, 0.34);
+  background: rgba(95, 173, 226, 0.12);
+}
+
+.missionTypeBadgeSpecial {
+  color: #d8b9ff;
+  border-color: rgba(216, 185, 255, 0.34);
+  background: rgba(142, 68, 173, 0.14);
+}
+
+.missionTypeBadgeUnlock {
+  color: var(--planner-gold);
+  border-color: rgba(240, 192, 64, 0.34);
+  background: rgba(240, 192, 64, 0.12);
+}
+
+.missionPanel {
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+}
+
+.guideAddButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-left: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 0.25rem;
+  color: var(--planner-text-2);
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.guideAddButton:hover {
+  border-color: var(--planner-gold-2);
+  color: var(--planner-gold);
+}
+
+.missionPanelHero {
+  margin-bottom: 1rem;
+}
+
+.missionPanelMeta {
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--planner-text-2);
+}
+
+.squadCard {
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.difficultyBadge,
+.omicronBadge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.difficultyBadge {
+  padding: 0.25rem 0.55rem;
+}
+
+.difficultyAuto {
+  border-color: rgba(39, 174, 96, 0.28);
+  color: var(--planner-mx);
+}
+
+.difficultyEasy {
+  border-color: rgba(52, 152, 219, 0.28);
+  color: #7fb6de;
+}
+
+.difficultyMedium {
+  border-color: rgba(240, 192, 64, 0.28);
+  color: var(--planner-gold);
+}
+
+.difficultyHard {
+  border-color: rgba(192, 57, 43, 0.3);
+  color: #ffb3ac;
+}
+
+.squadSection {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+}
+
+.squadSectionLabel {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--planner-text-3);
+  text-transform: uppercase;
+}
+
+.squadSectionValue,
+.squadNotes {
+  font-size: 0.76rem;
+  color: var(--planner-text-2);
+  line-height: 1.55;
+}
+
+.guideRosterStatusReady,
+.guideRosterStatusMissing {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.guideRosterStatusReady {
+  color: #7ce5a9;
+}
+
+.guideRosterStatusMissing {
+  color: #ffb3ac;
+}
+
+.guideCheckList {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.guideCheckResultReady,
+.guideCheckResultMissing {
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.guideCheckResultReady {
+  color: #7ce5a9;
+}
+
+.guideCheckResultMissing {
+  color: #ffb3ac;
+}
+
+.omicronList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.omicronBadge {
+  padding: 0.2rem 0.5rem;
+  border-color: var(--planner-bonus-dim);
+  background: rgba(142, 68, 173, 0.16);
+  color: #d8b9ff;
+}
+
+.linkButton {
+  margin-top: 0.75rem;
+  padding: 0;
+  border: 0;
+  color: var(--planner-gold);
+  font-size: 0.74rem;
+}
+
+.squadActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 20px 14px;
+  overflow: auto;
+  background: #060b14;
+}
+
+.modalCard {
+  width: min(620px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem 1.5rem;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.58);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.closeButton {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  background: var(--planner-bg-4);
+  color: var(--planner-text-2);
+  cursor: pointer;
+}
+
+.difficultyButton {
+  padding: 0.35rem 0.8rem;
+  border-radius: 0.45rem;
+}
+
+.difficultyButtonActive {
+  border-color: var(--planner-gold);
+  background: rgba(240, 192, 64, 0.15);
+  color: var(--planner-gold);
+}
+
+.omicronOptionList {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.omicronOptionCard {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.modalError {
+  color: #ffb3ac;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.modalSlotsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.slotGroupHeading {
+  margin-top: 0.2rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--planner-gold);
+}
+
+.modalHeader {
+  position: sticky;
+  top: -1.25rem;
+  z-index: 2;
+  margin: -1.25rem -1.5rem 1rem;
+  padding: 1.1rem 1.5rem 0.9rem;
+  background: var(--planner-bg-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.omicronChecklist {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.checklistItem {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.rosterTopBar {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.rosterSelectWrap {
+  min-width: 15rem;
+  flex: 1;
+}
+
+.searchRow {
+  flex-wrap: wrap;
+}
+
+.summaryText {
+  font-size: 0.72rem;
+}
+
+.sortBar,
+.rosterRow {
+  display: grid;
+  grid-template-columns: 1.7fr 0.8fr 0.7fr 0.8fr 0.9fr 3fr;
+  gap: 0.35rem;
+}
+
+.sortBar {
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.5rem;
+  background: var(--planner-bg-2);
+  margin-bottom: 0.35rem;
+}
+
+.sortButton {
+  padding: 0.2rem 0.25rem;
+  border: 0;
+  font-size: 0.68rem;
+  text-align: left;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sortButtonActive {
+  color: var(--planner-gold);
+}
+
+.rosterSectionHeader {
+  padding: 0.35rem 0.65rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--planner-bg-2);
+}
+
+.rosterSectionTitle {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--planner-text-2);
+}
+
+.rosterList {
+  overflow: auto;
+}
+
+.emptyStateTitle {
+  margin-bottom: 0.4rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  color: var(--planner-gold);
+  text-transform: uppercase;
+}
+
+.emptyStateCopy,
+.modalFooterCopy {
+  font-size: 0.76rem;
+  color: var(--planner-text-2);
+  line-height: 1.55;
+}
+
+.modalFooterCopy {
+  flex: 1;
+  min-width: 14rem;
+}
+
+.emptyRosterRow {
+  padding: 1rem 0.75rem;
+  color: var(--planner-text-3);
+  font-size: 0.78rem;
+}
+
+.rosterRow {
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  align-items: start;
+  font-size: 0.75rem;
+}
+
+.abilityList {
+  font-size: 0.68rem;
+  color: var(--planner-text-2);
+}
+
+.abilityStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.abilityRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.18rem 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.42rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.abilityName {
+  color: var(--planner-text);
+}
+
+.abilityMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.28rem;
+  flex-wrap: wrap;
+}
+
+.abilityDetail {
+  color: var(--planner-text-3);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.abilityTag {
+  border-radius: 999px;
+  padding: 0.06rem 0.36rem;
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.abilityTagZeta {
+  color: #d0b0ff;
+  background: rgba(142, 68, 173, 0.2);
+  border-color: rgba(208, 176, 255, 0.36);
+}
+
+.abilityTagOmicron {
+  color: #ffb2a8;
+  background: rgba(192, 57, 43, 0.22);
+  border-color: rgba(255, 178, 168, 0.36);
+}
+
+.abilityMissing,
+.rosterPowerMissing {
+  color: var(--planner-text-3);
+}
+
+.rosterPowerValue {
+  color: var(--planner-text-2);
+}
+
+@media (max-width: 980px) {
+  .opsLayout,
+  .guideLayout,
+  .controlsGrid,
+  .twoColumnGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .header,
+  .main {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .headerTopRow,
+  .warningHeader,
+  .memberToolbar,
+  .dayBlockHeader,
+  .guideTopBar,
+  .rosterTopBar,
+  .missionPanelHero,
+  .modalHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .formGrid,
+  .sortBar,
+  .rosterRow {
+    grid-template-columns: 1fr;
+  }
+
+  .navTabs {
+    gap: 0.35rem;
+  }
+
+  .navTab {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 0.5rem;
+  }
+}

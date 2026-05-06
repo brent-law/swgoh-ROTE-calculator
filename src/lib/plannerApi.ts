@@ -119,6 +119,17 @@ export type PlannerPlanetState = {
   preloaded: number;
   smReady: boolean;
   smCount: number;
+  missionOverrides: Record<string, PlannerMissionOverrideState>;
+};
+
+export type PlannerMissionOverrideState = {
+  rateOverride: number | null;
+  countOverride: number | null;
+};
+
+export type PlannerPlanetHoldConfig = {
+  planetId: string;
+  days: number;
 };
 
 export type PlannerSettings = {
@@ -133,6 +144,7 @@ export type PlannerSettings = {
   fleetFalloff: number;
   dailyUndep: number[];
   planetState: Record<string, PlannerPlanetState>;
+  planetHold: PlannerPlanetHoldConfig | null;
 };
 
 export type PlannerMissionDefinition = {
@@ -404,12 +416,51 @@ export type GuideTbOmicronResponse = {
   areaLabel: string;
 };
 
+export type GuideUnitCatalogEntry = {
+  defId: string;
+  name: string;
+  combatType: number;
+};
+
+export type GuideUnitCatalogResponse = {
+  status: string;
+  units: GuideUnitCatalogEntry[];
+};
+
 export type OpsDefinitionsResponse = {
   status: string;
   defs: OpsDefinitions;
   count: number;
   source: string;
   sourceLabel: string;
+};
+
+export type ExportBundleFile = {
+  name: string;
+  contents: string;
+};
+
+export type WriteExportBundleResponse = {
+  directory: string;
+  openPath: string;
+  filesWritten: number;
+};
+
+export type ExportPreviewDocument = {
+  id: string;
+  title: string;
+  html: string;
+};
+
+export type ExportPreviewResponse = {
+  title: string;
+  initialDocumentId: string;
+  documents: ExportPreviewDocument[];
+};
+
+export type OpenExportPreviewResponse = {
+  token: string;
+  windowLabel: string;
 };
 
 export type PersistedPlannerState = {
@@ -482,8 +533,39 @@ export const plannerApi = {
   getGuideTbOmicrons() {
     return invokeCommand<GuideTbOmicronResponse>("get_guide_tb_omicrons");
   },
+  getGuideUnitCatalog() {
+    return invokeCommand<GuideUnitCatalogResponse>("get_guide_unit_catalog");
+  },
   getPlannerReference() {
     return invokeCommand<PlannerReferenceResponse>("get_planner_reference");
+  },
+  writeExportBundle(
+    folderName: string,
+    openFileName: string,
+    files: ExportBundleFile[],
+  ) {
+    return invokeCommand<WriteExportBundleResponse>("write_export_bundle", {
+      request: { folderName, openFileName, files },
+    });
+  },
+  openExportPreview(
+    title: string,
+    initialDocumentId: string,
+    documents: ExportPreviewDocument[],
+  ) {
+    return invokeCommand<OpenExportPreviewResponse>("open_export_preview", {
+      request: { title, initialDocumentId, documents },
+    });
+  },
+  getExportPreview(token: string) {
+    return invokeCommand<ExportPreviewResponse>("get_export_preview", {
+      request: { token },
+    });
+  },
+  releaseExportPreview(token: string) {
+    return invokeCommand<{ released: boolean }>("release_export_preview", {
+      request: { token },
+    });
   },
   buildPlannerProjection(settings: PlannerSettings) {
     return invokeCommand<PlannerProjectionResponse>("build_planner_projection", {

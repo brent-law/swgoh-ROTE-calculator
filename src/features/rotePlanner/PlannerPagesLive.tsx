@@ -1,8 +1,21 @@
-import { Fragment, useEffect, useRef, useState, type ChangeEvent } from "react";
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FocusEvent as ReactFocusEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type Ref,
+} from "react";
 import { createPortal } from "react-dom";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useLocation } from "react-router-dom";
 import type {
+  ExportPreviewResponse,
   GuildSummary,
   GuideSquad,
+  GuideUnitCatalogEntry,
   OpsDefinitions,
   PlannerMissionDefinition,
   PlannerOptimizationResponse,
@@ -11,6 +24,7 @@ import type {
   PlannerSettings,
   SimplifiedRosterUnit,
 } from "../../lib/plannerApi";
+import { plannerApi } from "../../lib/plannerApi";
 import { usePlannerStore } from "../../state/plannerStoreCore";
 import {
   dayPlanAlgorithms,
@@ -18,6 +32,12 @@ import {
   type GuideDifficulty,
   type RosterAbility,
 } from "./mockData";
+import {
+  buildPlanExportPreview,
+  buildPlannerSnapshotPayload,
+  type PlanExportDetailMode,
+  type PlanExportMode,
+} from "./planExport";
 import {
   buildOperationsMetrics,
   buildOperationsStage,
@@ -49,7 +69,7 @@ function alignBadgeClassName(align: string, bonusLocked?: boolean) {
       ? styles.alignBadgeDs
       : align === "mx"
         ? styles.alignBadgeMx
-        : styles.alignBadgeLs
+      : styles.alignBadgeLs
   }`;
 }
 
@@ -77,9 +97,9 @@ function isGuideBonusPlanet(planet: PlannerPlanetDefinition) {
 }
 
 function guideMissionTypeIcon(mission: PlannerMissionDefinition) {
-  if (mission.unlocks || mission.missionType === "sm") return "★";
-  if (mission.missionType === "fleet") return "⚓";
-  return "⚔";
+  if (mission.unlocks || mission.missionType === "sm") return "\u2605";
+  if (mission.missionType === "fleet") return "\u2693";
+  return "\u2694";
 }
 
 function guideMissionTypeLabel(mission: PlannerMissionDefinition) {
@@ -116,6 +136,32 @@ function buildGuidePhasePlanets(planets: PlannerPlanetDefinition[]) {
         return left.name.localeCompare(right.name);
       }),
   }));
+}
+
+function exportPreviewTokenFromSearch(search: string) {
+  const fromSearch = new URLSearchParams(search).get("token")?.trim();
+  if (fromSearch) return fromSearch;
+  const hashQuery = window.location.hash.split("?")[1] ?? "";
+  return new URLSearchParams(hashQuery).get("token")?.trim() ?? "";
+}
+
+function commandErrorMessage(reason: unknown) {
+  if (reason instanceof Error) return reason.message;
+  if (typeof reason === "string") return reason;
+  if (reason && typeof reason === "object") {
+    if ("message" in reason && typeof reason.message === "string") {
+      return reason.message;
+    }
+    if ("error" in reason && typeof reason.error === "string") {
+      return reason.error;
+    }
+    try {
+      return JSON.stringify(reason);
+    } catch {
+      return String(reason);
+    }
+  }
+  return String(reason);
 }
 
 function plannerCardsForChain(
@@ -178,8 +224,26 @@ function plannerDepth(planetId: string) {
   }
 }
 
-function missionEstimateInputLimit(cmMode: string) {
-  return cmMode === "count" ? 50 : 100;
+function plannerMaxHoldDays(planet: PlannerPlanetDefinition) {
+  return Math.max(1, 7 - planet.phase);
+}
+
+function plannerBonusPlanetUnlocked(
+  planet: PlannerPlanetDefinition,
+  settings: PlannerSettings,
+) {
+  if (planet.chain !== "bonus" || !planet.unlockedBy) {
+    return true;
+  }
+  const sourceState = settings.planetState[planet.unlockedBy];
+  if (sourceState?.smReady) {
+    return true;
+  }
+  return (sourceState?.smCount ?? 0) >= (planet.unlockedAt ?? 0);
+}
+
+function missionEstimateInputLimit(cmMode: string, memberCount = 50) {
+  return cmMode === "count" ? Math.max(1, Math.round(memberCount || 50)) : 100;
 }
 
 function planetPlannerDisplayValue(
@@ -207,6 +271,23 @@ function planetPlannerDisplayValue(
       ? state?.cmCountOverride ?? defaultCount
       : state?.fleetCountOverride ?? defaultCount,
   );
+}
+
+function planetPlannerMissionDisplayValue(
+  planetId: string,
+  missionId: string,
+  settings: PlannerSettings,
+  state: PlannerPlanetState | undefined,
+  kind: "cm" | "fleet",
+) {
+  const missionOverride = state?.missionOverrides?.[missionId];
+  const planetValue = planetPlannerDisplayValue(planetId, settings, state, kind);
+
+  if (settings.cmMode === "pct") {
+    return Math.round(missionOverride?.rateOverride ?? planetValue);
+  }
+
+  return Math.round(missionOverride?.countOverride ?? planetValue);
 }
 
 function starCountFromStatus(status: string) {
@@ -463,7 +544,17 @@ function guideMissionKey(planetId: string, missionId: string) {
 }
 
 function normalizeGuideUnitName(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  let normalized = "";
+  for (const character of value.trim()) {
+    if (character === "&") {
+      normalized += "and";
+      continue;
+    }
+    if (/[a-z0-9]/i.test(character)) {
+      normalized += character.toLowerCase();
+    }
+  }
+  return normalized;
 }
 
 function normalizeGuideDefId(value: string) {
@@ -474,8 +565,20 @@ function normalizeGuideSkillKey(value: string) {
   return normalizeGuideDefId(value);
 }
 
-function buildGuideUnitLookup(guildRosters: ReturnType<typeof usePlannerStore.getState>["guildRosters"]) {
+function buildGuideUnitLookup(
+  guideUnitCatalog: GuideUnitCatalogEntry[],
+  guildRosters: ReturnType<typeof usePlannerStore.getState>["guildRosters"],
+) {
   const lookup = new Map<string, GuideUnitLookup>();
+  for (const unit of guideUnitCatalog) {
+    const normalizedName = normalizeGuideUnitName(unit.name);
+    if (!normalizedName || lookup.has(normalizedName)) continue;
+    lookup.set(normalizedName, {
+      defId: unit.defId,
+      name: unit.name,
+      combatType: unit.combatType,
+    });
+  }
   for (const roster of Object.values(guildRosters)) {
     for (const unit of roster ?? []) {
       const normalizedName = normalizeGuideUnitName(unit.name);
@@ -783,6 +886,7 @@ function buildGuideEditorFieldOptions(
   options: string[],
   guideUnitLookup: Map<string, GuideUnitLookup>,
   query: string,
+  isFleetMission: boolean,
 ) {
   const currentValue =
     fieldKey === "leader"
@@ -803,17 +907,166 @@ function buildGuideEditorFieldOptions(
   draft.members.forEach((member, index) => pushOccupied(member, `member-${index}`));
 
   const needle = normalizeGuideUnitName(query);
-  return options
-    .filter((option) => {
-      const optionLookup = guideUnitLookup.get(normalizeGuideUnitName(option));
-      const optionKey = buildGuideUnitSelectionKey(option, optionLookup);
-      if (optionKey && occupiedKeys.has(optionKey) && optionKey !== currentKey) {
-        return false;
+  const role = fieldKey === "leader" ? "leader" : "member";
+  const available = options.filter((option) => {
+    const optionLookup = guideUnitLookup.get(normalizeGuideUnitName(option));
+    if (!optionLookup) return false;
+    if (isFleetMission && role === "leader" && !isCapitalGuideUnit(optionLookup)) {
+      return false;
+    }
+    if (isFleetMission && role !== "leader" && isCapitalGuideUnit(optionLookup)) {
+      return false;
+    }
+    const optionKey = buildGuideUnitSelectionKey(option, optionLookup);
+    if (optionKey && occupiedKeys.has(optionKey) && optionKey !== currentKey) {
+      return false;
+    }
+    return true;
+  });
+
+  if (!needle) {
+    return available.slice(0, 80);
+  }
+
+  const starts: string[] = [];
+  const contains: string[] = [];
+  for (const option of available) {
+    const normalizedOption = normalizeGuideUnitName(option);
+    if (normalizedOption.startsWith(needle)) {
+      starts.push(option);
+      continue;
+    }
+    if (normalizedOption.includes(needle)) {
+      contains.push(option);
+    }
+  }
+
+  return starts.concat(contains).slice(0, 80);
+}
+
+type GuideAutocompleteFieldProps = {
+  fieldKey: string;
+  label: string;
+  placeholder: string;
+  value: string;
+  options: string[];
+  isOpen: boolean;
+  highlightedIndex: number;
+  inputRef?: Ref<HTMLInputElement>;
+  onOpen: (fieldKey: string) => void;
+  onClose: (fieldKey: string) => void;
+  onChange: (fieldKey: string, value: string) => void;
+  onSelect: (fieldKey: string, value: string) => void;
+  onHighlight: (index: number) => void;
+};
+
+function GuideAutocompleteField({
+  fieldKey,
+  label,
+  placeholder,
+  value,
+  options,
+  isOpen,
+  highlightedIndex,
+  inputRef,
+  onOpen,
+  onClose,
+  onChange,
+  onSelect,
+  onHighlight,
+}: GuideAutocompleteFieldProps) {
+  const hasSuggestions = options.length > 0;
+
+  const handleBlur = (event: ReactFocusEvent<HTMLDivElement>) => {
+    const nextFocusTarget = event.relatedTarget;
+    if (nextFocusTarget instanceof Node && event.currentTarget.contains(nextFocusTarget)) {
+      return;
+    }
+    onClose(fieldKey);
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen) {
+      if (event.key === "ArrowDown" && hasSuggestions) {
+        event.preventDefault();
+        onOpen(fieldKey);
+        onHighlight(0);
       }
-      if (!needle) return true;
-      return normalizeGuideUnitName(option).includes(needle);
-    })
-    .slice(0, 80);
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (hasSuggestions) {
+        onHighlight((highlightedIndex + 1) % options.length);
+      }
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (hasSuggestions) {
+        onHighlight((highlightedIndex - 1 + options.length) % options.length);
+      }
+      return;
+    }
+
+    if (event.key === "Enter") {
+      const highlightedOption = options[highlightedIndex];
+      if (highlightedOption) {
+        event.preventDefault();
+        onSelect(fieldKey, highlightedOption);
+      }
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose(fieldKey);
+    }
+  };
+
+  return (
+    <label className={styles.modalField}>
+      <span className={styles.label}>{label}</span>
+      <div className={styles.autocompleteField} onBlur={handleBlur}>
+        <input
+          ref={inputRef}
+          className={styles.modalInput}
+          autoComplete="off"
+          placeholder={placeholder}
+          value={value}
+          aria-autocomplete="list"
+          aria-expanded={isOpen}
+          onFocus={() => onOpen(fieldKey)}
+          onChange={(event) => onChange(fieldKey, event.currentTarget.value)}
+          onKeyDown={handleKeyDown}
+        />
+        {isOpen ? (
+          <div className={styles.autocompleteList}>
+            {hasSuggestions ? (
+              options.map((option, index) => (
+                <button
+                  key={`${fieldKey}-${option}`}
+                  type="button"
+                  className={`${styles.autocompleteOption} ${
+                    index === highlightedIndex ? styles.autocompleteOptionActive : ""
+                  }`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => onSelect(fieldKey, option)}
+                  onFocus={() => onHighlight(index)}
+                >
+                  {option}
+                </button>
+              ))
+            ) : (
+              <div className={styles.autocompleteEmpty}>No matching units found.</div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </label>
+  );
 }
 
 function guidePlanetNameClassName(
@@ -881,6 +1134,8 @@ function GuideEditorModal({
     createGuideEditorDraft(isFleetMission, initialSquad),
   );
   const [error, setError] = useState("");
+  const [openFieldKey, setOpenFieldKey] = useState<string | null>("leader");
+  const [highlightedOptionIndex, setHighlightedOptionIndex] = useState(0);
   const guideOmicronOptions = buildGuideOmicronOptions(
     draft,
     isFleetMission,
@@ -892,6 +1147,8 @@ function GuideEditorModal({
     setDifficulty(initialDifficulty);
     setDraft(createGuideEditorDraft(isFleetMission, initialSquad));
     setError("");
+    setOpenFieldKey("leader");
+    setHighlightedOptionIndex(0);
   }, [initialDifficulty, initialSquad, isFleetMission, mission.id, planet.id]);
 
   useEffect(() => {
@@ -933,22 +1190,42 @@ function GuideEditorModal({
   }, [onClose]);
 
   const optionSource = isFleetMission ? guideShipOptions : guideCharacterOptions;
-  const leaderOptions = buildGuideEditorFieldOptions(
-    draft,
-    "leader",
-    optionSource,
-    guideUnitLookup,
-    draft.leader,
-  );
+  const buildFieldOptions = (fieldKey: string, value: string) =>
+    buildGuideEditorFieldOptions(
+      draft,
+      fieldKey,
+      optionSource,
+      guideUnitLookup,
+      value,
+      isFleetMission,
+    );
+  const leaderOptions =
+    openFieldKey === "leader" ? buildFieldOptions("leader", draft.leader) : [];
 
-  const updateMember = (index: number, value: string) => {
-    setDraft((current) => ({
-      ...current,
-      members: current.members.map((entry, memberIndex) =>
-        memberIndex === index ? value : entry,
-      ),
-    }));
+  const updateFieldValue = (fieldKey: string, value: string) => {
+    setDraft((current) => {
+      if (fieldKey === "leader") {
+        return {
+          ...current,
+          leader: value,
+        };
+      }
+      const index = Number(fieldKey.replace("member-", ""));
+      return {
+        ...current,
+        members: current.members.map((entry, memberIndex) =>
+          memberIndex === index ? value : entry,
+        ),
+      };
+    });
+    setOpenFieldKey(fieldKey);
+    setHighlightedOptionIndex(0);
     setError("");
+  };
+
+  const selectFieldOption = (fieldKey: string, value: string) => {
+    updateFieldValue(fieldKey, value);
+    setOpenFieldKey(null);
   };
 
   const submit = () => {
@@ -1075,27 +1352,27 @@ function GuideEditorModal({
           </div>
         </div>
 
-        <label className={styles.modalField}>
-          <span className={styles.label}>
-            {isFleetMission ? "Capital Ship Leader" : "Squad Leader"}
-          </span>
-          <input
-            ref={leaderInputRef}
-            className={styles.modalInput}
-            list="guide-editor-leader-options"
-            autoComplete="off"
-            placeholder={isFleetMission ? "e.g. Leviathan" : "e.g. Sith Eternal Emperor"}
-            value={draft.leader}
-            onChange={(event) => {
-              const nextLeader = event.currentTarget.value;
-              setDraft((current) => ({
-                ...current,
-                leader: nextLeader,
-              }));
-              setError("");
-            }}
-          />
-        </label>
+        <GuideAutocompleteField
+          fieldKey="leader"
+          label={isFleetMission ? "Capital Ship Leader" : "Squad Leader"}
+          placeholder={isFleetMission ? "e.g. Leviathan" : "e.g. Sith Eternal Emperor"}
+          value={draft.leader}
+          options={leaderOptions}
+          isOpen={openFieldKey === "leader"}
+          highlightedIndex={highlightedOptionIndex}
+          inputRef={leaderInputRef}
+          onOpen={(fieldKey) => {
+            setOpenFieldKey(fieldKey);
+            setHighlightedOptionIndex(0);
+          }}
+          onClose={(fieldKey) => {
+            setOpenFieldKey((current) => (current === fieldKey ? null : current));
+            setHighlightedOptionIndex(0);
+          }}
+          onChange={updateFieldValue}
+          onSelect={selectFieldOption}
+          onHighlight={setHighlightedOptionIndex}
+        />
 
         <div className={styles.fieldHint}>
           Start typing to narrow the list. Units must be unique within a squad.
@@ -1113,30 +1390,29 @@ function GuideEditorModal({
             <div className={styles.modalSlotsGrid}>
               {draft.members.slice(0, GUIDE_FLEET_STARTER_COUNT).map((member, index) => {
                 const fieldKey = `member-${index}`;
-                const options = buildGuideEditorFieldOptions(
-                  draft,
-                  fieldKey,
-                  guideShipOptions,
-                  guideUnitLookup,
-                  member,
-                );
+                const options = openFieldKey === fieldKey ? buildFieldOptions(fieldKey, member) : [];
                 return (
-                  <label key={`starter-${index}`} className={styles.modalField}>
-                    <span className={styles.label}>Starting Ship {index + 1}</span>
-                    <input
-                      className={styles.modalInput}
-                      list={`guide-editor-options-${fieldKey}`}
-                      autoComplete="off"
-                      placeholder={`Starting Ship ${index + 1}`}
-                      value={member}
-                      onChange={(event) => updateMember(index, event.currentTarget.value)}
-                    />
-                    <datalist id={`guide-editor-options-${fieldKey}`}>
-                      {options.map((option) => (
-                        <option key={`${fieldKey}-${option}`} value={option} />
-                      ))}
-                    </datalist>
-                  </label>
+                  <GuideAutocompleteField
+                    key={`starter-${index}`}
+                    fieldKey={fieldKey}
+                    label={`Starting Ship ${index + 1}`}
+                    placeholder={`Starting Ship ${index + 1}`}
+                    value={member}
+                    options={options}
+                    isOpen={openFieldKey === fieldKey}
+                    highlightedIndex={highlightedOptionIndex}
+                    onOpen={(nextFieldKey) => {
+                      setOpenFieldKey(nextFieldKey);
+                      setHighlightedOptionIndex(0);
+                    }}
+                    onClose={(nextFieldKey) => {
+                      setOpenFieldKey((current) => (current === nextFieldKey ? null : current));
+                      setHighlightedOptionIndex(0);
+                    }}
+                    onChange={updateFieldValue}
+                    onSelect={selectFieldOption}
+                    onHighlight={setHighlightedOptionIndex}
+                  />
                 );
               })}
             </div>
@@ -1146,30 +1422,29 @@ function GuideEditorModal({
               {draft.members.slice(GUIDE_FLEET_STARTER_COUNT).map((member, index) => {
                 const memberIndex = index + GUIDE_FLEET_STARTER_COUNT;
                 const fieldKey = `member-${memberIndex}`;
-                const options = buildGuideEditorFieldOptions(
-                  draft,
-                  fieldKey,
-                  guideShipOptions,
-                  guideUnitLookup,
-                  member,
-                );
+                const options = openFieldKey === fieldKey ? buildFieldOptions(fieldKey, member) : [];
                 return (
-                  <label key={`reinforcement-${index}`} className={styles.modalField}>
-                    <span className={styles.label}>Reinforcement {index + 1}</span>
-                    <input
-                      className={styles.modalInput}
-                      list={`guide-editor-options-${fieldKey}`}
-                      autoComplete="off"
-                      placeholder={`Reinforcement ${index + 1}`}
-                      value={member}
-                      onChange={(event) => updateMember(memberIndex, event.currentTarget.value)}
-                    />
-                    <datalist id={`guide-editor-options-${fieldKey}`}>
-                      {options.map((option) => (
-                        <option key={`${fieldKey}-${option}`} value={option} />
-                      ))}
-                    </datalist>
-                  </label>
+                  <GuideAutocompleteField
+                    key={`reinforcement-${index}`}
+                    fieldKey={fieldKey}
+                    label={`Reinforcement ${index + 1}`}
+                    placeholder={`Reinforcement ${index + 1}`}
+                    value={member}
+                    options={options}
+                    isOpen={openFieldKey === fieldKey}
+                    highlightedIndex={highlightedOptionIndex}
+                    onOpen={(nextFieldKey) => {
+                      setOpenFieldKey(nextFieldKey);
+                      setHighlightedOptionIndex(0);
+                    }}
+                    onClose={(nextFieldKey) => {
+                      setOpenFieldKey((current) => (current === nextFieldKey ? null : current));
+                      setHighlightedOptionIndex(0);
+                    }}
+                    onChange={updateFieldValue}
+                    onSelect={selectFieldOption}
+                    onHighlight={setHighlightedOptionIndex}
+                  />
                 );
               })}
             </div>
@@ -1178,30 +1453,29 @@ function GuideEditorModal({
           <div className={styles.modalSlotsGrid}>
             {draft.members.map((member, index) => {
               const fieldKey = `member-${index}`;
-              const options = buildGuideEditorFieldOptions(
-                draft,
-                fieldKey,
-                guideCharacterOptions,
-                guideUnitLookup,
-                member,
-              );
+              const options = openFieldKey === fieldKey ? buildFieldOptions(fieldKey, member) : [];
               return (
-                <label key={`member-${index}`} className={styles.modalField}>
-                  <span className={styles.label}>Member {index + 2}</span>
-                  <input
-                    className={styles.modalInput}
-                    list={`guide-editor-options-${fieldKey}`}
-                    autoComplete="off"
-                    placeholder={`Member ${index + 2}`}
-                    value={member}
-                    onChange={(event) => updateMember(index, event.currentTarget.value)}
-                  />
-                  <datalist id={`guide-editor-options-${fieldKey}`}>
-                    {options.map((option) => (
-                      <option key={`${fieldKey}-${option}`} value={option} />
-                    ))}
-                  </datalist>
-                </label>
+                <GuideAutocompleteField
+                  key={`member-${index}`}
+                  fieldKey={fieldKey}
+                  label={`Member ${index + 2}`}
+                  placeholder={`Member ${index + 2}`}
+                  value={member}
+                  options={options}
+                  isOpen={openFieldKey === fieldKey}
+                  highlightedIndex={highlightedOptionIndex}
+                  onOpen={(nextFieldKey) => {
+                    setOpenFieldKey(nextFieldKey);
+                    setHighlightedOptionIndex(0);
+                  }}
+                  onClose={(nextFieldKey) => {
+                    setOpenFieldKey((current) => (current === nextFieldKey ? null : current));
+                    setHighlightedOptionIndex(0);
+                  }}
+                  onChange={updateFieldValue}
+                  onSelect={selectFieldOption}
+                  onHighlight={setHighlightedOptionIndex}
+                />
               );
             })}
           </div>
@@ -1295,12 +1569,6 @@ function GuideEditorModal({
             {initialSquad ? "Update Squad" : "Save Squad"}
           </button>
         </div>
-
-        <datalist id="guide-editor-leader-options">
-          {leaderOptions.map((option) => (
-            <option key={`leader-${option}`} value={option} />
-          ))}
-        </datalist>
       </div>
     </div>
   );
@@ -1354,7 +1622,10 @@ export function GuildOverviewPage() {
     Math.max(0, plannerSettings.fleetBase - index * plannerSettings.fleetFalloff),
   );
   const falloffMax = Math.max(...cmValues, ...fleetValues, 1);
-  const estimateInputLimit = missionEstimateInputLimit(plannerSettings.cmMode);
+  const estimateInputLimit = missionEstimateInputLimit(
+    plannerSettings.cmMode,
+    plannerSettings.guildMembers,
+  );
   const guildMemberCount = guildSummary?.members.length ?? plannerSettings.guildMembers;
   const guildGpValue = guildSummary?.gp ?? plannerSettings.guildGp;
 
@@ -1673,8 +1944,225 @@ export function PlanetPlannerPage() {
   const plannerSettings = usePlannerStore((state) => state.plannerSettings);
   const setSelectedChain = usePlannerStore((state) => state.setSelectedChain);
   const setPlanetPlannerState = usePlannerStore((state) => state.setPlanetPlannerState);
+  const setPlanetMissionOverride = usePlannerStore((state) => state.setPlanetMissionOverride);
   const cards = plannerCardsForChain(selectedChain, plannerReference, plannerProjection);
-  const plannerInputLimit = missionEstimateInputLimit(plannerSettings.cmMode);
+  const plannerInputLimit = missionEstimateInputLimit(
+    plannerSettings.cmMode,
+    plannerSettings.guildMembers,
+  );
+
+  const renderPlanetCard = (
+    planet: PlannerPlanetDefinition,
+    card: NonNullable<typeof plannerProjection>["planetCards"][string],
+  ) => {
+    const state = plannerSettings.planetState[planet.id];
+    const bonusLocked = !plannerBonusPlanetUnlocked(planet, plannerSettings);
+    const stars = starCountFromStatus(card.status);
+    const specialUnlock = card.specialMissions.find((mission) => mission.unlocks);
+    const regularSpecialMissions = card.specialMissions.filter((mission) => !mission.unlocks);
+    const unlockedLabel = specialUnlock?.unlocks
+      ? `${specialUnlock.unlocks.charAt(0).toUpperCase()}${specialUnlock.unlocks.slice(1)}`
+      : "";
+
+    return (
+      <article
+        className={`${styles.planetCard} ${
+          planet.align === "bonus"
+            ? styles.planetCardBonus
+            : planet.align === "ds"
+              ? styles.planetCardDs
+              : planet.align === "mx"
+                ? styles.planetCardMx
+                : styles.planetCardLs
+        } ${card.status === "s3" ? styles.planetCardS3 : ""} ${
+          card.status === "s2" ? styles.planetCardS2 : ""
+        } ${card.status === "s1" ? styles.planetCardS1 : ""} ${
+          bonusLocked ? styles.planetCardLocked : ""
+        }`}
+      >
+        <div className={styles.planetHeader}>
+          <div>
+            <div className={styles.planetName}>{card.name}</div>
+            <div className={styles.planetCapability}>{card.capability}</div>
+          </div>
+          <span className={alignBadgeClassName(card.align, bonusLocked)}>
+            {card.align === "bonus"
+              ? bonusLocked
+                ? "Bonus Locked"
+                : "Bonus"
+              : card.align === "ds"
+                ? "Dark"
+                : card.align === "mx"
+                  ? "Mixed"
+                  : "Light"}
+          </span>
+        </div>
+
+        <div className={styles.starsRow}>
+          {[0, 1, 2].map((index) => (
+            <span
+              key={`${planet.id}-star-${index}`}
+              className={`${styles.star} ${index < stars ? styles.starActive : ""}`}
+            >
+              {index < stars ? "\u2605" : "\u2606"}
+            </span>
+          ))}
+        </div>
+
+        <div className={styles.pointsRow}>
+          Est: <strong>{formatMillions(card.estimate)}</strong> / {formatMillions(card.target)}
+        </div>
+        <div className={styles.progressBar}>
+          <div className={styles.progressFill} style={{ width: `${card.progress}%` }} />
+        </div>
+
+        <div className={styles.missionSection}>
+          <div className={styles.missionHeader}>
+            Combat / Special Missions ({card.combatMissions.length})
+          </div>
+          {card.combatMissions.map((mission) => (
+            <div key={mission.id} className={styles.missionEstimateRow}>
+              <span>{mission.label}</span>
+              <div>
+                <div className={styles.miniLabel}>
+                  {plannerSettings.cmMode === "pct" ? "Clear %" : "Clear #"}
+                </div>
+                <input
+                  className={styles.tableInput}
+                  type="number"
+                  min={0}
+                  max={plannerInputLimit}
+                  value={planetPlannerMissionDisplayValue(
+                    planet.id,
+                    mission.id,
+                    plannerSettings,
+                    state,
+                    "cm",
+                  )}
+                  onChange={(event) =>
+                    setPlanetMissionOverride(planet.id, mission.id, {
+                      ...(plannerSettings.cmMode === "pct"
+                        ? {
+                            rateOverride: Number(event.currentTarget.value) || 0,
+                            countOverride: null,
+                          }
+                        : {
+                            countOverride: Number(event.currentTarget.value) || 0,
+                            rateOverride: null,
+                          }),
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <div className={styles.miniLabel}>est pts</div>
+                <div className={styles.miniValue}>{formatMillions(mission.points)}</div>
+              </div>
+            </div>
+          ))}
+          {card.fleetMissions.map((mission) => (
+            <div key={mission.id} className={styles.missionEstimateRow}>
+              <span>{mission.label}</span>
+              <div>
+                <div className={styles.miniLabel}>
+                  {plannerSettings.cmMode === "pct" ? "Comp %" : "Comp #"}
+                </div>
+                <input
+                  className={styles.tableInput}
+                  type="number"
+                  min={0}
+                  max={plannerInputLimit}
+                  value={planetPlannerMissionDisplayValue(
+                    planet.id,
+                    mission.id,
+                    plannerSettings,
+                    state,
+                    "fleet",
+                  )}
+                  onChange={(event) =>
+                    setPlanetMissionOverride(planet.id, mission.id, {
+                      ...(plannerSettings.cmMode === "pct"
+                        ? {
+                            rateOverride: Number(event.currentTarget.value) || 0,
+                            countOverride: null,
+                          }
+                        : {
+                            countOverride: Number(event.currentTarget.value) || 0,
+                            rateOverride: null,
+                          }),
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <div className={styles.miniLabel}>est pts</div>
+                <div className={styles.miniValue}>{formatMillions(mission.points)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {specialUnlock ? (
+          <div className={styles.specialMissionBox}>
+            <div className={styles.specialMissionLabel}>{specialUnlock.label}</div>
+            <label className={styles.specialMissionToggle}>
+              <input
+                type="checkbox"
+                checked={Boolean(state?.smReady)}
+                onChange={(event) =>
+                  setPlanetPlannerState(planet.id, {
+                    smReady: event.currentTarget.checked,
+                    smCount: event.currentTarget.checked
+                      ? Math.max(state?.smCount ?? 0, planet.smThreshold ?? 0)
+                      : 0,
+                  })
+                }
+              />
+              <span>
+                Plan to unlock {unlockedLabel || "the bonus planet"} on {planet.name}
+              </span>
+            </label>
+            <div className={styles.specialMissionNote}>
+              {state?.smReady
+                ? `${unlockedLabel || "Bonus planet"} is enabled for the planner.`
+                : "Leave unchecked unless the guild can clear this unlock special mission."}
+              {regularSpecialMissions.length ? (
+                <>
+                  <br />
+                  Other special missions:{" "}
+                  {regularSpecialMissions.map((mission) => mission.label).join(", ")}
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : regularSpecialMissions.length ? (
+          <div className={styles.specialMissionBox}>
+            <div className={styles.specialMissionLabel}>
+              {regularSpecialMissions.length > 1 ? "Special Missions" : "Special Mission"}
+            </div>
+            <div className={styles.specialMissionNote}>
+              Guide-only missions on this planet:{" "}
+              {regularSpecialMissions.map((mission) => mission.label).join(", ")}. These do not
+              add projected territory points.
+            </div>
+          </div>
+        ) : null}
+
+        <div className={styles.operationsRow}>
+          {Array.from({ length: Math.max(card.operationsTotal, 6) }).map((_, slotIndex) => (
+            <span
+              key={`${planet.id}-${slotIndex}`}
+              className={`${styles.operationsPill} ${slotIndex < card.operationsFilled ? styles.operationsPillOn : ""}`}
+            >
+              {slotIndex + 1}
+            </span>
+          ))}
+        </div>
+        <div className={styles.noteText}>{card.operationsNote}</div>
+        <div className={styles.planetNote}>{bonusLocked ? "Bonus locked" : card.note}</div>
+      </article>
+    );
+  };
 
   return (
     <section className={styles.panel}>
@@ -1706,185 +2194,190 @@ export function PlanetPlannerPage() {
       </div>
 
       <div className={styles.chainStack}>
-        {cards.map(({ planet, card }) => {
-          const state = plannerSettings.planetState[planet.id];
-          const cmValue = planetPlannerDisplayValue(
-            planet.id,
-            plannerSettings,
-            state,
-            "cm",
-          );
-          const fleetValue = planetPlannerDisplayValue(
-            planet.id,
-            plannerSettings,
-            state,
-            "fleet",
-          );
-          const stars = starCountFromStatus(card.status);
-          const specialUnlock = card.specialMissions.find((mission) => mission.unlocks);
-          const regularSpecialMissions = card.specialMissions.filter((mission) => !mission.unlocks);
-          return (
-            <article
-              key={planet.id}
-              className={`${styles.planetCard} ${
-                planet.align === "bonus"
-                  ? styles.planetCardBonus
-                  : planet.align === "ds"
-                    ? styles.planetCardDs
-                    : planet.align === "mx"
-                      ? styles.planetCardMx
-                      : styles.planetCardLs
-              } ${card.status === "s3" ? styles.planetCardS3 : ""} ${
-                card.status === "s2" ? styles.planetCardS2 : ""
-              } ${card.status === "s1" ? styles.planetCardS1 : ""} ${
-                card.bonusLocked ? styles.planetCardLocked : ""
-              }`}
-            >
-              <div className={styles.planetHeader}>
-                <div>
-                  <div className={styles.planetName}>{card.name}</div>
-                  <div className={styles.planetCapability}>{card.capability}</div>
-                </div>
-                <span className={alignBadgeClassName(card.align, card.bonusLocked)}>
-                  {card.align === "bonus"
-                    ? card.bonusLocked
-                      ? "Bonus Locked"
-                      : "Bonus"
-                    : card.align === "ds"
-                      ? "Dark"
-                      : card.align === "mx"
-                        ? "Mixed"
-                        : "Light"}
-                </span>
-              </div>
-
-              <div className={styles.starsRow}>
-                {[0, 1, 2].map((index) => (
-                  <span
-                    key={`${planet.id}-star-${index}`}
-                    className={`${styles.star} ${index < stars ? styles.starActive : ""}`}
-                  >
-                    {index < stars ? "★" : "☆"}
-                  </span>
-                ))}
-              </div>
-
-              <div className={styles.pointsRow}>
-                Est: <strong>{formatMillions(card.estimate)}</strong> / {formatMillions(card.target)}
-              </div>
-              <div className={styles.progressBar}>
-                <div className={styles.progressFill} style={{ width: `${card.progress}%` }} />
-              </div>
-
-              <div className={styles.missionSection}>
-                <div className={styles.missionHeader}>
-                  Combat / Special Missions ({card.combatMissions.length})
-                </div>
-                {card.combatMissions.map((mission) => (
-                  <div key={mission.id} className={styles.missionEstimateRow}>
-                    <span>{mission.label}</span>
-                    <div>
-                      <div className={styles.miniLabel}>
-                        {plannerSettings.cmMode === "pct" ? "Clear %" : "Clear #"}
-                      </div>
-                      <input
-                        className={styles.tableInput}
-                        type="number"
-                        min={0}
-                        max={plannerInputLimit}
-                        value={cmValue}
-                        onChange={(event) =>
-                          setPlanetPlannerState(planet.id, {
-                            ...(plannerSettings.cmMode === "pct"
-                              ? {
-                                  cmRateOverride: Number(event.currentTarget.value) || 0,
-                                  cmCountOverride: null,
-                                }
-                              : {
-                                  cmCountOverride: Number(event.currentTarget.value) || 0,
-                                  cmRateOverride: null,
-                                }),
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <div className={styles.miniLabel}>est pts</div>
-                      <div className={styles.miniValue}>{formatMillions(mission.points)}</div>
-                    </div>
-                  </div>
-                ))}
-                {card.fleetMissions.map((mission) => (
-                  <div key={mission.id} className={styles.missionEstimateRow}>
-                    <span>{mission.label}</span>
-                    <div>
-                      <div className={styles.miniLabel}>
-                        {plannerSettings.cmMode === "pct" ? "Comp %" : "Comp #"}
-                      </div>
-                      <input
-                        className={styles.tableInput}
-                        type="number"
-                        min={0}
-                        max={plannerInputLimit}
-                        value={fleetValue}
-                        onChange={(event) =>
-                          setPlanetPlannerState(planet.id, {
-                            ...(plannerSettings.cmMode === "pct"
-                              ? {
-                                  fleetRateOverride: Number(event.currentTarget.value) || 0,
-                                  fleetCountOverride: null,
-                                }
-                              : {
-                                  fleetCountOverride: Number(event.currentTarget.value) || 0,
-                                  fleetRateOverride: null,
-                                }),
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <div className={styles.miniLabel}>est pts</div>
-                      <div className={styles.miniValue}>{formatMillions(mission.points)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {specialUnlock ? (
-                <label className={styles.field}>
-                  <span className={styles.label}>{specialUnlock.label}</span>
-                  <div className={styles.noteText}>{specialUnlock.unitsText}</div>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(state.smReady)}
-                    onChange={(event) =>
-                      setPlanetPlannerState(planet.id, { smReady: event.currentTarget.checked })
-                    }
-                  />
-                </label>
-              ) : regularSpecialMissions.length ? (
-                <div className={styles.noteText}>
-                  Guide-only special missions on this planet:{" "}
-                  {regularSpecialMissions.map((mission) => mission.label).join(", ")}.
-                </div>
-              ) : null}
-
-              <div className={styles.operationsRow}>
-                {Array.from({ length: Math.max(card.operationsTotal, 6) }).map((_, slotIndex) => (
-                  <span
-                    key={`${planet.id}-${slotIndex}`}
-                    className={`${styles.operationsPill} ${slotIndex < card.operationsFilled ? styles.operationsPillOn : ""}`}
-                  >
-                    {slotIndex + 1}
-                  </span>
-                ))}
-              </div>
-              <div className={styles.noteText}>{card.operationsNote}</div>
-              <div className={styles.planetNote}>{card.note}</div>
-            </article>
-          );
-        })}
+        {cards.map(({ planet, card }) => (
+          <Fragment key={planet.id}>{renderPlanetCard(planet, card)}</Fragment>
+        ))}
       </div>
+
+    </section>
+  );
+}
+
+export function ExportPreviewPage() {
+  const location = useLocation();
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const releasedRef = useRef(false);
+  const [preview, setPreview] = useState<ExportPreviewResponse | null>(null);
+  const [activeDocumentId, setActiveDocumentId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const token = exportPreviewTokenFromSearch(location.search);
+
+  const releasePreview = () => {
+    if (!token || releasedRef.current) {
+      return Promise.resolve();
+    }
+    releasedRef.current = true;
+    return plannerApi.releaseExportPreview(token).catch(() => undefined);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!token) {
+      setPreview(null);
+      setActiveDocumentId("");
+      setError("This export preview is missing its session token.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setPreview(null);
+    releasedRef.current = false;
+
+    void plannerApi
+      .getExportPreview(token)
+      .then((response) => {
+        if (cancelled) return;
+        setPreview(response);
+        setActiveDocumentId(response.initialDocumentId || response.documents[0]?.id || "");
+        setLoading(false);
+      })
+      .catch((reason) => {
+        if (cancelled) return;
+        const message = commandErrorMessage(reason);
+        setError(`Could not load the export preview: ${message}`);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const handleBeforeUnload = () => {
+      void releasePreview();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!preview) return;
+    document.title = preview.title;
+  }, [preview]);
+
+  useEffect(() => {
+    if (!preview?.documents.length) return;
+    if (preview.documents.some((document) => document.id === activeDocumentId)) return;
+    setActiveDocumentId(preview.initialDocumentId || preview.documents[0]?.id || "");
+  }, [activeDocumentId, preview]);
+
+  const activeDocument =
+    preview?.documents.find((document) => document.id === activeDocumentId) ??
+    preview?.documents[0] ??
+    null;
+
+  const handlePrint = () => {
+    const frameWindow = iframeRef.current?.contentWindow;
+    if (!frameWindow) {
+      setError("The preview is still loading. Try Print again in a moment.");
+      return;
+    }
+    frameWindow.focus();
+    frameWindow.print();
+  };
+
+  const handleClose = () => {
+    void releasePreview().finally(() => {
+      void getCurrentWebviewWindow()
+        .close()
+        .catch(() => window.close());
+    });
+  };
+
+  return (
+    <section className={styles.exportPreviewShell}>
+      <div className={styles.exportPreviewHeader}>
+        <div>
+          <div className={styles.exportPreviewTitle}>
+            {preview?.title ?? "Plan Export Preview"}
+          </div>
+          <div className={styles.exportPreviewNote}>
+            Review the print-ready plan here, then click Print and choose Save as PDF to select a
+            location on the computer.
+          </div>
+        </div>
+
+        <div className={styles.exportPreviewToolbar}>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={handlePrint}
+            disabled={loading || !activeDocument}
+          >
+            Print
+          </button>
+          <button type="button" className={styles.secondaryButton} onClick={handleClose}>
+            Close
+          </button>
+        </div>
+      </div>
+
+      {preview && preview.documents.length > 1 ? (
+        <div className={styles.exportPreviewDocStrip}>
+          {preview.documents.map((document) => (
+            <button
+              key={document.id}
+              type="button"
+              className={`${styles.exportPreviewDocButton} ${
+                document.id === activeDocument?.id ? styles.exportPreviewDocButtonActive : ""
+              }`}
+              onClick={() => setActiveDocumentId(document.id)}
+            >
+              {document.title}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <article className={styles.emptyStateCard}>
+          <div className={styles.emptyStateTitle}>Loading export preview</div>
+          <div className={styles.emptyStateCopy}>
+            Building the printable preview window. This usually only takes a moment.
+          </div>
+        </article>
+      ) : error ? (
+        <article className={styles.emptyStateCard}>
+          <div className={styles.emptyStateTitle}>Export preview unavailable</div>
+          <div className={styles.emptyStateCopy}>{error}</div>
+        </article>
+      ) : activeDocument ? (
+        <div className={styles.exportPreviewFrameWrap}>
+          <iframe
+            ref={iframeRef}
+            title={activeDocument.title}
+            srcDoc={activeDocument.html}
+            className={styles.exportPreviewFrame}
+          />
+        </div>
+      ) : (
+        <article className={styles.emptyStateCard}>
+          <div className={styles.emptyStateTitle}>No export document available</div>
+          <div className={styles.emptyStateCopy}>
+            The planner did not generate a printable document for this preview session.
+          </div>
+        </article>
+      )}
     </section>
   );
 }
@@ -1893,7 +2386,29 @@ export function DayByDayPlanPage() {
   const plannerReference = usePlannerStore((state) => state.plannerReference);
   const plannerProjection = usePlannerStore((state) => state.plannerProjection);
   const plannerResult = usePlannerStore((state) => state.plannerResult);
+  const guildSummary = usePlannerStore((state) => state.guildSummary);
+  const guildRosters = usePlannerStore((state) => state.guildRosters);
+  const opsDefinitions = usePlannerStore((state) => state.opsDefinitions);
+  const opsAnalysis = usePlannerStore((state) => state.opsAnalysis);
+  const plannerSettings = usePlannerStore((state) => state.plannerSettings);
+  const primaryAllyCode = usePlannerStore((state) => state.primaryAllyCode);
   const selectedAlgorithm = usePlannerStore((state) => state.selectedAlgorithm);
+  const setPlanetHold = usePlannerStore((state) => state.setPlanetHold);
+  const setPlanetHoldDays = usePlannerStore((state) => state.setPlanetHoldDays);
+  const selectedChain = usePlannerStore((state) => state.selectedChain);
+  const selectedOperationsDay = usePlannerStore((state) => state.selectedOperationsDay);
+  const selectedOperationsPlanetId = usePlannerStore(
+    (state) => state.selectedOperationsPlanetId,
+  );
+  const selectedGuideMember = usePlannerStore((state) => state.selectedGuideMember);
+  const selectedGuideMission = usePlannerStore((state) => state.selectedGuideMission);
+  const expandedGuidePlanets = usePlannerStore((state) => state.expandedGuidePlanets);
+  const guideData = usePlannerStore((state) => state.guideData);
+  const guideEditorDifficulty = usePlannerStore((state) => state.guideEditorDifficulty);
+  const selectedRosterMemberId = usePlannerStore((state) => state.selectedRosterMemberId);
+  const rosterSearch = usePlannerStore((state) => state.rosterSearch);
+  const rosterFilter = usePlannerStore((state) => state.rosterFilter);
+  const rosterSortKey = usePlannerStore((state) => state.rosterSortKey);
   const optimizerAcknowledged = usePlannerStore((state) => state.optimizerAcknowledged);
   const optimizerDirty = usePlannerStore((state) => state.optimizerDirty);
   const isRunningOptimization = usePlannerStore((state) => state.isRunningOptimization);
@@ -1901,15 +2416,31 @@ export function DayByDayPlanPage() {
   const optimizerStatusMessage = usePlannerStore(
     (state) => state.optimizerStatusMessage,
   );
+  const importPlannerSnapshot = usePlannerStore((state) => state.importPlannerSnapshot);
   const setSelectedAlgorithm = usePlannerStore((state) => state.setSelectedAlgorithm);
   const acknowledgeOptimizerWarning = usePlannerStore((state) => state.acknowledgeOptimizerWarning);
   const runPlannerOptimization = usePlannerStore((state) => state.runPlannerOptimization);
+
+  const [exportMode, setExportMode] = useState<PlanExportMode>("all");
+  const [detailMode, setDetailMode] = useState<PlanExportDetailMode>("detailed");
+  const [transferStatus, setTransferStatus] = useState("");
+  const snapshotInputRef = useRef<HTMLInputElement | null>(null);
 
   const algorithms = plannerReference?.algorithms ?? dayPlanAlgorithms;
   const summary = plannerResult?.summary ?? plannerProjection?.summary;
   const selectedAlgorithmLabel =
     algorithms.find((algorithm) => algorithm.id === selectedAlgorithm)?.label ??
     selectedAlgorithm;
+  const holdPlanetOptions = (plannerReference?.planets ?? [])
+    .slice()
+    .sort((left, right) => left.phase - right.phase || left.name.localeCompare(right.name));
+  const selectedHoldPlanet = holdPlanetOptions.find(
+    (planet) => planet.id === plannerSettings.planetHold?.planetId,
+  );
+  const holdMaxDays = selectedHoldPlanet ? plannerMaxHoldDays(selectedHoldPlanet) : 0;
+  const holdDaysValue = plannerSettings.planetHold
+    ? Math.min(plannerSettings.planetHold.days, Math.max(1, holdMaxDays))
+    : 0;
   const dayPlanStatusMessage = (() => {
     if (isRunningOptimization) {
       return optimizerStatusMessage || `Running ${selectedAlgorithmLabel || "optimization"}...`;
@@ -1934,6 +2465,95 @@ export function DayByDayPlanPage() {
     }
     return "Select an algorithm and click Run to generate the optimal TB plan.";
   })();
+
+  const handleExportPlan = async () => {
+    if (!plannerResult) {
+      setTransferStatus("Run the optimizer first to export a day-by-day plan PDF.");
+      return;
+    }
+    setTransferStatus("Preparing the print preview...");
+    try {
+      const preview = buildPlanExportPreview({
+        plannerResult,
+        guildSummary,
+        guildRosters,
+        plannerReference,
+        opsDefinitions,
+        opsAnalysis,
+        plannerSettings,
+        mode: exportMode,
+        detailMode,
+      });
+      await plannerApi.openExportPreview(
+        preview.title,
+        preview.initialDocumentId,
+        preview.documents,
+      );
+      setTransferStatus(
+        exportMode === "separate"
+          ? "Opened the day-by-day preview window. Use Print on each day tab to choose Save as PDF and a destination."
+          : "Opened the full-plan preview window. Use Print and choose Save as PDF to pick a save location.",
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setTransferStatus(`Plan export failed: ${message}`);
+    }
+  };
+
+  const handleSaveSnapshot = () => {
+    if (!plannerResult) {
+      setTransferStatus("Run the optimizer first to save a full planning snapshot.");
+      return;
+    }
+    const payload = buildPlannerSnapshotPayload({
+      primaryAllyCode,
+      plannerSettings,
+      selectedAlgorithm,
+      optimizerAcknowledged,
+      selectedChain,
+      selectedOperationsDay,
+      selectedOperationsPlanetId,
+      selectedGuideMember,
+      selectedGuideMission,
+      expandedGuidePlanets,
+      guideData,
+      guideEditorDifficulty,
+      selectedRosterMemberId,
+      rosterSearch,
+      rosterFilter,
+      rosterSortKey,
+      guildSummary,
+      guildRosters,
+      opsDefinitions,
+      opsAnalysis,
+      plannerProjection,
+      plannerResult,
+    });
+    const stamp = new Date().toISOString().replace(/:/g, "-").replace(/\..+$/, "");
+    triggerJsonDownload(`rote-plan-snapshot-${stamp}.json`, payload);
+    setTransferStatus(
+      "Planning snapshot saved. This file can restore the exact guild, rosters, plan, and operations later.",
+    );
+  };
+
+  const handleLoadSnapshot = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    setTransferStatus(`Loading snapshot from ${file.name}...`);
+    try {
+      const payload = JSON.parse(await file.text());
+      await importPlannerSnapshot(payload);
+      setTransferStatus(
+        `Snapshot loaded - restored guild, rosters, day plan, and operations from ${file.name}.`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setTransferStatus(`Failed to load planning snapshot: ${message}`);
+    } finally {
+      input.value = "";
+    }
+  };
 
   return (
     <section className={styles.panel}>
@@ -1996,6 +2616,62 @@ export function DayByDayPlanPage() {
         ))}
       </div>
 
+      <div className={styles.exportToolbar}>
+        <div className={styles.exportToolbarGroup}>
+          <label className={styles.inlineField}>
+            <span className={styles.label}>Leave Planet Open</span>
+            <select
+              className={styles.selectControl}
+              value={plannerSettings.planetHold?.planetId ?? ""}
+              onChange={(event) => {
+                const planetId = event.currentTarget.value.trim();
+                if (!planetId) {
+                  setPlanetHold(null);
+                  return;
+                }
+                const planet = holdPlanetOptions.find((entry) => entry.id === planetId);
+                const maxDays = planet ? plannerMaxHoldDays(planet) : 1;
+                setPlanetHold(planetId);
+                setPlanetHoldDays(maxDays);
+              }}
+              disabled={isRunningOptimization}
+            >
+              <option value="">No forced hold</option>
+              {holdPlanetOptions.map((planet) => (
+                <option key={planet.id} value={planet.id}>
+                  {planet.name} (P{planet.phase})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.inlineField}>
+            <span className={styles.label}>Hold Days</span>
+            <select
+              className={styles.selectControl}
+              value={plannerSettings.planetHold ? String(holdDaysValue) : ""}
+              onChange={(event) => setPlanetHoldDays(Number(event.currentTarget.value) || 1)}
+              disabled={!plannerSettings.planetHold || isRunningOptimization}
+            >
+              {!plannerSettings.planetHold ? <option value="">Select a planet first</option> : null}
+              {Array.from({ length: holdMaxDays }, (_, index) => index + 1).map((days) => (
+                <option key={days} value={days}>
+                  {days} day{days === 1 ? "" : "s"}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className={styles.exportToolbarGroup}>
+          <div className={styles.noteText}>
+            {selectedHoldPlanet
+              ? `${selectedHoldPlanet.name} can be held open for up to ${holdMaxDays} day${
+                  holdMaxDays === 1 ? "" : "s"
+                }. The optimizer will keep it below roughly half of 1-star until the hold is satisfied, then chase the best star outcome around that constraint.`
+              : "Optional hold rule: keep one planet open for extra special-mission attempts while the optimizer still maximizes stars everywhere else."}
+          </div>
+        </div>
+      </div>
+
       <div className={styles.controlsGrid}>
         <select
           className={styles.selectControl}
@@ -2029,6 +2705,73 @@ export function DayByDayPlanPage() {
       </div>
 
       <div className={styles.statusLine}>{dayPlanStatusMessage}</div>
+
+      <div className={styles.exportToolbar}>
+        <div className={styles.exportToolbarGroup}>
+          <label className={styles.inlineField}>
+            <span className={styles.label}>Export mode</span>
+            <select
+              className={styles.selectControl}
+              value={exportMode}
+              onChange={(event) => setExportMode(event.currentTarget.value as PlanExportMode)}
+              disabled={isRunningOptimization}
+            >
+              <option value="all">One preview with all days</option>
+              <option value="separate">Separate print views by day</option>
+            </select>
+          </label>
+          <label className={styles.inlineField}>
+            <span className={styles.label}>Layout</span>
+            <select
+              className={styles.selectControl}
+              value={detailMode}
+              onChange={(event) =>
+                setDetailMode(event.currentTarget.value as PlanExportDetailMode)
+              }
+              disabled={isRunningOptimization}
+            >
+              <option value="detailed">Detailed operations layout</option>
+              <option value="condensed">Condensed operations layout</option>
+            </select>
+          </label>
+        </div>
+
+        <div className={styles.exportToolbarGroup}>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={() => void handleExportPlan()}
+            disabled={!plannerResult || isRunningOptimization}
+          >
+            Preview / Print Plan
+          </button>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={handleSaveSnapshot}
+            disabled={!plannerResult || isRunningOptimization}
+          >
+            Save Plan Snapshot
+          </button>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => snapshotInputRef.current?.click()}
+            disabled={isRunningOptimization}
+          >
+            Load Plan Snapshot
+          </button>
+          <input
+            ref={snapshotInputRef}
+            type="file"
+            accept=".json,application/json"
+            className={styles.hiddenInput}
+            onChange={(event) => void handleLoadSnapshot(event)}
+          />
+        </div>
+      </div>
+
+      {transferStatus ? <div className={styles.exportStatusLine}>{transferStatus}</div> : null}
 
       {plannerResult && plannerResult.algorithmScores.length > 1 ? (
         <div className={styles.algorithmScoreGrid}>
@@ -2382,7 +3125,7 @@ export function GuidesPageLegacy() {
                           isGuideBonusPlanet(planet) ? styles.guidePlanetNameBonus : ""
                         }`}
                       >
-                        {isGuideBonusPlanet(planet) ? "⊕ " : ""}
+                        {isGuideBonusPlanet(planet) ? "\u2022 " : ""}
                         {planet.name}
                       </span>
                       <span className={styles.guidePlanetCount} />
@@ -2616,6 +3359,7 @@ export function GuidesPage() {
   const guildSummary = usePlannerStore((state) => state.guildSummary);
   const guildRosters = usePlannerStore((state) => state.guildRosters);
   const guideTbOmicrons = usePlannerStore((state) => state.guideTbOmicrons);
+  const guideUnitCatalog = usePlannerStore((state) => state.guideUnitCatalog);
   const guideData = usePlannerStore((state) => state.guideData);
   const selectedGuideMember = usePlannerStore((state) => state.selectedGuideMember);
   const selectedGuideMission = usePlannerStore((state) => state.selectedGuideMission);
@@ -2659,7 +3403,7 @@ export function GuidesPage() {
     scannedMembers.find((member) => member.id === selectedGuideMember)?.label ??
     "No scanned member selected";
   const selectedRoster = selectedGuideMember ? guildRosters[selectedGuideMember] ?? null : null;
-  const guideUnitLookup = buildGuideUnitLookup(guildRosters);
+  const guideUnitLookup = buildGuideUnitLookup(guideUnitCatalog, guildRosters);
   const guideUnits = Array.from(guideUnitLookup.values()).sort((left, right) =>
     left.name.localeCompare(right.name),
   );
@@ -2825,7 +3569,7 @@ export function GuidesPage() {
                       onClick={() => toggleGuidePlanet(planet.id)}
                     >
                       <span className={guidePlanetNameClassName(planet, styles)}>
-                        {isGuideBonusPlanet(planet) ? "Bonus " : ""}
+                        {isGuideBonusPlanet(planet) ? "\u2022 " : ""}
                         {planet.name}
                       </span>
                       <span className={styles.guidePlanetCount}>

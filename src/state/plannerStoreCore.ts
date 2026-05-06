@@ -5,6 +5,7 @@ import {
   type ComlinkStatus,
   type GuideDataSnapshot,
   type GuideSquad,
+  type GuideUnitCatalogEntry,
   type GuideTbOmicronRequirement,
   type GuideTbOmicronMap,
   type GuildRosters,
@@ -13,6 +14,8 @@ import {
   type PersistedPlannerState,
   type PlannerAlgorithmScore,
   type PlannerOptimizationProgressEvent,
+  type PlannerMissionOverrideState,
+  type PlannerPlanetHoldConfig,
   type PlannerOptimizationResponse,
   type PlannerPlanetState,
   type PlannerProjectionResponse,
@@ -52,6 +55,8 @@ let guildScanProgressListener: Promise<UnlistenFn> | null = null;
 const plannerOptimizationProgressEvent = "planner-optimization-progress";
 let plannerOptimizationProgressListener: Promise<UnlistenFn> | null = null;
 let optimizationResetTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+let plannerProjectionRequestSequence = 0;
+let hydrationPromise: Promise<void> | null = null;
 
 export type PlannerStore = {
   guildName: string;
@@ -96,6 +101,7 @@ export type PlannerStore = {
   opsDefinitions: OpsDefinitions | null;
   opsAnalysis: PlatoonAnalysisMap | null;
   guideTbOmicrons: GuideTbOmicronMap;
+  guideUnitCatalog: GuideUnitCatalogEntry[];
   plannerReference: PlannerReferenceResponse | null;
   plannerSettings: PlannerSettings;
   plannerProjection: PlannerProjectionResponse | null;
@@ -111,6 +117,7 @@ export type PlannerStore = {
   refreshPlannerProjection: () => Promise<void>;
   runPlannerOptimization: () => Promise<void>;
   persistAppState: () => Promise<void>;
+  importPlannerSnapshot: (snapshot: unknown) => Promise<void>;
   setPrimaryAllyCode: (primaryAllyCode: string) => void;
   setGuildName: (guildName: string) => void;
   setActivePhase: (activePhase: number) => void;
@@ -138,6 +145,13 @@ export type PlannerStore = {
     planetId: string,
     patch: Partial<PlannerPlanetState>,
   ) => void;
+  setPlanetMissionOverride: (
+    planetId: string,
+    missionId: string,
+    patch: Partial<PlannerMissionOverrideState>,
+  ) => void;
+  setPlanetHold: (planetId: string | null) => void;
+  setPlanetHoldDays: (days: number) => void;
   applyMissionEstimatesToPlanner: () => void;
   resetWorkspace: () => Promise<void>;
   setSelectedChain: (selectedChain: ChainKey) => void;
@@ -176,6 +190,7 @@ function defaultPlannerSettings(): PlannerSettings {
     fleetFalloff: 15,
     dailyUndep: [3, 5, 6, 8, 10, 12],
     planetState: {},
+    planetHold: null,
   };
 }
 
@@ -188,6 +203,14 @@ function defaultPlanetPlannerState(): PlannerPlanetState {
     preloaded: 0,
     smReady: false,
     smCount: 0,
+    missionOverrides: {},
+  };
+}
+
+function defaultMissionOverrideState(): PlannerMissionOverrideState {
+  return {
+    rateOverride: null,
+    countOverride: null,
   };
 }
 
@@ -385,6 +408,7 @@ function buildPlanetOverridePatch(
       fleetRateOverride: null,
       cmCountOverride: clampNumber(Math.round((memberCount * cmValue) / 100), 0, 50),
       fleetCountOverride: clampNumber(Math.round((memberCount * fleetValue) / 100), 0, 50),
+      missionOverrides: {},
     };
   }
 
@@ -393,7 +417,32 @@ function buildPlanetOverridePatch(
     fleetRateOverride: clampNumber(fleetValue, 0, 100),
     cmCountOverride: null,
     fleetCountOverride: null,
+    missionOverrides: {},
   };
+}
+
+function sanitizeMissionOverridePatch(
+  settings: PlannerSettings,
+  patch: Partial<PlannerMissionOverrideState>,
+): Partial<PlannerMissionOverrideState> {
+  const nextPatch = { ...patch };
+
+  if (typeof nextPatch.rateOverride === "number") {
+    nextPatch.rateOverride = clampNumber(nextPatch.rateOverride, 0, 100);
+  }
+  if (typeof nextPatch.countOverride === "number") {
+    nextPatch.countOverride = clampNumber(nextPatch.countOverride, 0, 50);
+  }
+
+  if (settings.cmMode === "pct") {
+    if (typeof nextPatch.rateOverride === "number") {
+      nextPatch.countOverride = null;
+    }
+  } else if (typeof nextPatch.countOverride === "number") {
+    nextPatch.rateOverride = null;
+  }
+
+  return nextPatch;
 }
 
 function sanitizePlanetPlannerPatch(
@@ -420,6 +469,19 @@ function sanitizePlanetPlannerPatch(
   if (typeof nextPatch.smCount === "number") {
     nextPatch.smCount = clampNumber(Math.round(nextPatch.smCount), 0, Number.MAX_SAFE_INTEGER);
   }
+  if (nextPatch.missionOverrides && typeof nextPatch.missionOverrides === "object") {
+    nextPatch.missionOverrides = Object.fromEntries(
+      Object.entries(nextPatch.missionOverrides).map(([missionId, missionPatch]) => [
+        missionId,
+        sanitizeMissionOverridePatch(
+          settings,
+          typeof missionPatch === "object" && missionPatch !== null
+            ? (missionPatch as Partial<PlannerMissionOverrideState>)
+            : {},
+        ),
+      ]),
+    ) as Record<string, PlannerMissionOverrideState>;
+  }
 
   if (settings.cmMode === "pct") {
     if (typeof nextPatch.cmRateOverride === "number") {
@@ -438,6 +500,37 @@ function sanitizePlanetPlannerPatch(
   }
 
   return nextPatch;
+}
+
+function normalizeMissionOverrideState(value: unknown): PlannerMissionOverrideState {
+  const defaults = defaultMissionOverrideState();
+  if (typeof value !== "object" || value === null) {
+    return defaults;
+  }
+
+  const record = value as Partial<PlannerMissionOverrideState>;
+  const normalizeOptionalNumber = (input: unknown) =>
+    typeof input === "number" && Number.isFinite(input) ? input : null;
+
+  return {
+    rateOverride: normalizeOptionalNumber(record.rateOverride),
+    countOverride: normalizeOptionalNumber(record.countOverride),
+  };
+}
+
+function normalizeMissionOverrideMap(
+  value: unknown,
+): Record<string, PlannerMissionOverrideState> {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([missionId, state]) => [
+      missionId,
+      normalizeMissionOverrideState(state),
+    ]),
+  );
 }
 
 function normalizePlanetPlannerState(value: unknown): PlannerPlanetState {
@@ -464,6 +557,7 @@ function normalizePlanetPlannerState(value: unknown): PlannerPlanetState {
       typeof record.smCount === "number" && Number.isFinite(record.smCount)
         ? record.smCount
         : defaults.smCount,
+    missionOverrides: normalizeMissionOverrideMap(record.missionOverrides),
   };
 }
 
@@ -526,6 +620,7 @@ function createInitialState() {
     opsDefinitions: null as OpsDefinitions | null,
     opsAnalysis: null as PlatoonAnalysisMap | null,
     guideTbOmicrons: {} as GuideTbOmicronMap,
+    guideUnitCatalog: [] as GuideUnitCatalogEntry[],
     plannerReference: null as PlannerReferenceResponse | null,
     plannerSettings: defaultPlannerSettings(),
     plannerProjection: null as PlannerProjectionResponse | null,
@@ -554,6 +649,36 @@ function isPersistedGuideMission(
   );
 }
 
+function normalizeSnapshotGuildSummary(value: unknown) {
+  return value && typeof value === "object" && Array.isArray((value as GuildSummary).members)
+    ? (value as GuildSummary)
+    : null;
+}
+
+function normalizeSnapshotGuildRosters(value: unknown) {
+  return value && typeof value === "object" ? (value as GuildRosters) : ({} as GuildRosters);
+}
+
+function normalizeSnapshotOpsDefinitions(value: unknown) {
+  return value && typeof value === "object" ? (value as OpsDefinitions) : null;
+}
+
+function normalizeSnapshotOpsAnalysis(value: unknown) {
+  return value && typeof value === "object" ? (value as PlatoonAnalysisMap) : null;
+}
+
+function normalizeSnapshotPlannerProjection(value: unknown) {
+  return value && typeof value === "object" ? (value as PlannerProjectionResponse) : null;
+}
+
+function normalizeSnapshotPlannerResult(value: unknown) {
+  return value &&
+    typeof value === "object" &&
+    Array.isArray((value as PlannerOptimizationResponse).dayPlan)
+    ? (value as PlannerOptimizationResponse)
+    : null;
+}
+
 function normalizePlannerSettings(
   persisted: unknown,
   guildSummary: GuildSummary | null,
@@ -570,6 +695,19 @@ function normalizePlannerSettings(
           : defaults.dailyUndep[index];
       })
     : defaults.dailyUndep;
+  const planetHold =
+    record.planetHold &&
+    typeof record.planetHold === "object" &&
+    typeof (record.planetHold as PlannerPlanetHoldConfig).planetId === "string"
+      ? {
+          planetId: String((record.planetHold as PlannerPlanetHoldConfig).planetId).trim(),
+          days: clampNumber(
+            Math.round(Number((record.planetHold as PlannerPlanetHoldConfig).days) || 1),
+            1,
+            6,
+          ),
+        }
+      : null;
 
   return {
     guildGp:
@@ -592,6 +730,7 @@ function normalizePlannerSettings(
         : defaults.fleetFalloff,
     dailyUndep,
     planetState: normalizePlanetPlannerStateMap(record.planetState),
+    planetHold: planetHold?.planetId ? planetHold : null,
   };
 }
 
@@ -698,6 +837,23 @@ async function refreshGuideOmicrons() {
   }
 }
 
+async function refreshGuideUnitCatalog() {
+  try {
+    const response = await plannerApi.getGuideUnitCatalog();
+    return response.units;
+  } catch {
+    return [] as GuideUnitCatalogEntry[];
+  }
+}
+
+function refreshGuideUnitCatalogInBackground(
+  set: (partial: Partial<PlannerStore>) => void,
+) {
+  void refreshGuideUnitCatalog().then((guideUnitCatalog) => {
+    set({ guideUnitCatalog });
+  });
+}
+
 function planetIdsForDay(result: PlannerOptimizationResponse | null, day: number) {
   const dayPlan = result?.dayPlan.find((entry) => entry.day === day);
   if (!dayPlan) return [];
@@ -767,121 +923,130 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
   hydrateFromBackend: async () => {
     ensureScanProgressListener();
     if (get().isHydrated) return;
-    set({ sessionStatus: "syncing", statusMessage: "Restoring planner state..." });
-    try {
-      const [bootstrap, plannerReference] = await Promise.all([
-        plannerApi.getBootstrapState(),
-        plannerApi.getPlannerReference(),
-      ]);
-      const persisted = bootstrap.appState ?? {};
-      const guildSummary = bootstrap.session.guildSummary;
-      const guildRosters = bootstrap.session.guildRosters ?? {};
-      const plannerSettings = normalizePlannerSettings(
-        persisted.plannerSettings,
-        guildSummary,
-      );
-      const persistedGuideMission = isPersistedGuideMission(
-        persisted.selectedGuideMission,
-      )
-        ? persisted.selectedGuideMission
-        : undefined;
-
-      set((state) => {
-        const firstScannedMember = firstRosterMember(guildRosters);
-        const persistedGuideMember =
-          typeof persisted.selectedGuideMember === "string"
-            ? persisted.selectedGuideMember
-            : "";
-        const persistedRosterMember =
-          typeof persisted.selectedRosterMemberId === "string"
-            ? persisted.selectedRosterMemberId
-            : "";
-
-        return {
-        isHydrated: true,
-        sessionStatus: "ready",
-        guildName: guildSummary?.name ?? state.guildName,
-        guildSummary,
-        guildRosters,
-        comlinkStatus: bootstrap.comlinkStatus,
-        plannerReference,
-        plannerSettings,
-        primaryAllyCode:
-          typeof persisted.primaryAllyCode === "string"
-            ? persisted.primaryAllyCode
-            : state.primaryAllyCode,
-        selectedAlgorithm:
-          typeof persisted.selectedAlgorithm === "string"
-            ? persisted.selectedAlgorithm
-            : state.selectedAlgorithm,
-        optimizerAcknowledged:
-          typeof persisted.optimizerAcknowledged === "boolean"
-            ? persisted.optimizerAcknowledged
-            : state.optimizerAcknowledged,
-        selectedChain:
-          persisted.selectedChain === "ds" ||
-          persisted.selectedChain === "mx" ||
-          persisted.selectedChain === "ls"
-            ? persisted.selectedChain
-            : state.selectedChain,
-        selectedOperationsDay:
-          typeof persisted.selectedOperationsDay === "number"
-            ? persisted.selectedOperationsDay
-            : state.selectedOperationsDay,
-        selectedOperationsPlanetId:
-          typeof persisted.selectedOperationsPlanetId === "string"
-            ? persisted.selectedOperationsPlanetId
-            : state.selectedOperationsPlanetId,
-        selectedGuideMember: hasRosterSelection(persistedGuideMember, guildRosters)
-          ? persistedGuideMember
-          : firstScannedMember,
-        selectedGuideMission: persistedGuideMission ?? state.selectedGuideMission,
-        expandedGuidePlanets: Array.isArray(persisted.expandedGuidePlanets)
-          ? persisted.expandedGuidePlanets.filter(
-              (entry): entry is string => typeof entry === "string",
-            )
-          : state.expandedGuidePlanets,
-        guideData: normalizeGuideData(persisted.guideData),
-        guideEditorDifficulty:
-          persisted.guideEditorDifficulty === "easy" ||
-          persisted.guideEditorDifficulty === "medium" ||
-          persisted.guideEditorDifficulty === "hard"
-            ? persisted.guideEditorDifficulty
-            : "auto",
-        selectedRosterMemberId: hasRosterSelection(persistedRosterMember, guildRosters)
-          ? persistedRosterMember
-          : firstScannedMember,
-        rosterSearch:
-          typeof persisted.rosterSearch === "string"
-            ? persisted.rosterSearch
-            : state.rosterSearch,
-        rosterFilter:
-          typeof persisted.rosterFilter === "string"
-            ? persisted.rosterFilter
-            : state.rosterFilter,
-        rosterSortKey:
-          typeof persisted.rosterSortKey === "string"
-            ? persisted.rosterSortKey
-            : state.rosterSortKey,
-        statusMessage:
-          bootstrap.comlinkStatus.comlink === "online"
-            ? "Planner ready."
-            : bootstrap.comlinkStatus.message ?? "Planner ready in offline mode.",
-        };
-      });
-      await get().refreshPlannerProjection();
-      if (bootstrap.comlinkStatus.comlink !== "online") {
-        void get().retryComlink();
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      set({
-        isHydrated: true,
-        sessionStatus: "ready",
-        lastError: message,
-        statusMessage: `Restore skipped: ${message}`,
-      });
+    if (hydrationPromise) {
+      return hydrationPromise;
     }
+    hydrationPromise = (async () => {
+      set({ sessionStatus: "syncing", statusMessage: "Restoring planner state..." });
+      try {
+        const [bootstrap, plannerReference] = await Promise.all([
+          plannerApi.getBootstrapState(),
+          plannerApi.getPlannerReference(),
+        ]);
+        const persisted = bootstrap.appState ?? {};
+        const guildSummary = bootstrap.session.guildSummary;
+        const guildRosters = bootstrap.session.guildRosters ?? {};
+        const plannerSettings = normalizePlannerSettings(
+          persisted.plannerSettings,
+          guildSummary,
+        );
+        const persistedGuideMission = isPersistedGuideMission(
+          persisted.selectedGuideMission,
+        )
+          ? persisted.selectedGuideMission
+          : undefined;
+
+        set((state) => {
+          const firstScannedMember = firstRosterMember(guildRosters);
+          const persistedGuideMember =
+            typeof persisted.selectedGuideMember === "string"
+              ? persisted.selectedGuideMember
+              : "";
+          const persistedRosterMember =
+            typeof persisted.selectedRosterMemberId === "string"
+              ? persisted.selectedRosterMemberId
+              : "";
+
+          return {
+            isHydrated: true,
+            sessionStatus: "ready",
+            guildName: guildSummary?.name ?? state.guildName,
+            guildSummary,
+            guildRosters,
+            comlinkStatus: bootstrap.comlinkStatus,
+            plannerReference,
+            plannerSettings,
+            primaryAllyCode:
+              typeof persisted.primaryAllyCode === "string"
+                ? persisted.primaryAllyCode
+                : state.primaryAllyCode,
+            selectedAlgorithm:
+              typeof persisted.selectedAlgorithm === "string"
+                ? persisted.selectedAlgorithm
+                : state.selectedAlgorithm,
+            optimizerAcknowledged:
+              typeof persisted.optimizerAcknowledged === "boolean"
+                ? persisted.optimizerAcknowledged
+                : state.optimizerAcknowledged,
+            selectedChain:
+              persisted.selectedChain === "ds" ||
+              persisted.selectedChain === "mx" ||
+              persisted.selectedChain === "ls"
+                ? persisted.selectedChain
+                : state.selectedChain,
+            selectedOperationsDay:
+              typeof persisted.selectedOperationsDay === "number"
+                ? persisted.selectedOperationsDay
+                : state.selectedOperationsDay,
+            selectedOperationsPlanetId:
+              typeof persisted.selectedOperationsPlanetId === "string"
+                ? persisted.selectedOperationsPlanetId
+                : state.selectedOperationsPlanetId,
+            selectedGuideMember: hasRosterSelection(persistedGuideMember, guildRosters)
+              ? persistedGuideMember
+              : firstScannedMember,
+            selectedGuideMission: persistedGuideMission ?? state.selectedGuideMission,
+            expandedGuidePlanets: Array.isArray(persisted.expandedGuidePlanets)
+              ? persisted.expandedGuidePlanets.filter(
+                  (entry): entry is string => typeof entry === "string",
+                )
+              : state.expandedGuidePlanets,
+            guideData: normalizeGuideData(persisted.guideData),
+            guideEditorDifficulty:
+              persisted.guideEditorDifficulty === "easy" ||
+              persisted.guideEditorDifficulty === "medium" ||
+              persisted.guideEditorDifficulty === "hard"
+                ? persisted.guideEditorDifficulty
+                : "auto",
+            selectedRosterMemberId: hasRosterSelection(persistedRosterMember, guildRosters)
+              ? persistedRosterMember
+              : firstScannedMember,
+            rosterSearch:
+              typeof persisted.rosterSearch === "string"
+                ? persisted.rosterSearch
+                : state.rosterSearch,
+            rosterFilter:
+              typeof persisted.rosterFilter === "string"
+                ? persisted.rosterFilter
+                : state.rosterFilter,
+            rosterSortKey:
+              typeof persisted.rosterSortKey === "string"
+                ? persisted.rosterSortKey
+                : state.rosterSortKey,
+            statusMessage:
+              bootstrap.comlinkStatus.comlink === "online"
+                ? "Planner ready."
+                : bootstrap.comlinkStatus.message ?? "Planner ready in offline mode.",
+          };
+        });
+        refreshGuideUnitCatalogInBackground((partial) => set(partial));
+        await get().refreshPlannerProjection();
+        if (bootstrap.comlinkStatus.comlink !== "online") {
+          void get().retryComlink();
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        set({
+          isHydrated: true,
+          sessionStatus: "ready",
+          lastError: message,
+          statusMessage: `Restore skipped: ${message}`,
+        });
+      } finally {
+        hydrationPromise = null;
+      }
+    })();
+    return hydrationPromise;
   },
   refreshComlinkStatus: async () => {
     try {
@@ -912,6 +1077,7 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
             : comlinkStatus.message ?? "swgoh-comlink is still offline.",
         lastError: null,
       });
+      refreshGuideUnitCatalogInBackground((partial) => set(partial));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       set({
@@ -962,6 +1128,7 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
         lastSyncAt: new Date().toISOString(),
         statusMessage: `Loaded ${response.summary.name} (${memberCount} members).`,
       }));
+      refreshGuideUnitCatalogInBackground((partial) => set(partial));
       await get().refreshPlannerProjection();
       await get().persistAppState();
     } catch (error) {
@@ -994,7 +1161,10 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
           displayName: member.displayName,
         })),
       );
-      const guideTbOmicrons = await refreshGuideOmicrons();
+      const [guideTbOmicrons, guideUnitCatalog] = await Promise.all([
+        refreshGuideOmicrons(),
+        refreshGuideUnitCatalog(),
+      ]);
       const firstScannedMember = firstRosterMember(response.guildRosters);
       clearOptimizationResetTimer();
       set((state) => ({
@@ -1002,6 +1172,7 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
         sessionStatus: "ready",
         guildRosters: response.guildRosters,
         guideTbOmicrons,
+        guideUnitCatalog,
         opsAnalysis: null,
         ...invalidateOptimizerState(state),
         selectedRosterMemberId: hasRosterSelection(
@@ -1086,11 +1257,18 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
   refreshPlannerProjection: async () => {
     const { plannerReference, plannerSettings } = get();
     if (!plannerReference) return;
+    const requestId = ++plannerProjectionRequestSequence;
     set({ isLoadingPlanner: true });
     try {
       const plannerProjection = await plannerApi.buildPlannerProjection(plannerSettings);
+      if (requestId !== plannerProjectionRequestSequence) {
+        return;
+      }
       set({ isLoadingPlanner: false, plannerProjection });
     } catch (error) {
+      if (requestId !== plannerProjectionRequestSequence) {
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       set({
         isLoadingPlanner: false,
@@ -1180,6 +1358,147 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
     } finally {
       set({ isPersisting: false });
     }
+  },
+  importPlannerSnapshot: async (snapshot) => {
+    const record =
+      snapshot && typeof snapshot === "object"
+        ? (snapshot as Record<string, unknown>)
+        : null;
+    if (!record) {
+      throw new Error("Invalid snapshot format.");
+    }
+
+    const guildRosters = normalizeSnapshotGuildRosters(record.guildRosters);
+    const plannerResult = normalizeSnapshotPlannerResult(record.plannerResult);
+    if (!Object.keys(guildRosters).length || !plannerResult) {
+      throw new Error("Snapshot is missing roster or plan data.");
+    }
+
+    await plannerApi.importSessionState(guildRosters);
+    const [guideTbOmicrons, guideUnitCatalog] = await Promise.all([
+      refreshGuideOmicrons(),
+      refreshGuideUnitCatalog(),
+    ]);
+
+    const guildSummary = normalizeSnapshotGuildSummary(record.guildSummary);
+    const plannerProjection = normalizeSnapshotPlannerProjection(record.plannerProjection);
+    const opsDefinitions = normalizeSnapshotOpsDefinitions(record.opsDefinitions);
+    const opsAnalysis = normalizeSnapshotOpsAnalysis(record.opsAnalysis);
+
+    clearOptimizationResetTimer();
+    set((state) => {
+      const nextGuildSummary = guildSummary ?? state.guildSummary;
+      const plannerSettings = normalizePlannerSettings(record.plannerSettings, nextGuildSummary);
+      const firstScannedMember = firstRosterMember(guildRosters);
+      const persistedGuideMember =
+        typeof record.selectedGuideMember === "string" ? record.selectedGuideMember : "";
+      const persistedRosterMember =
+        typeof record.selectedRosterMemberId === "string"
+          ? record.selectedRosterMemberId
+          : "";
+      const selectedOperationsDay =
+        typeof record.selectedOperationsDay === "number" &&
+        Number.isFinite(record.selectedOperationsDay)
+          ? record.selectedOperationsDay
+          : 1;
+
+      return {
+        isHydrated: true,
+        isFetchingGuild: false,
+        isScanningRosters: false,
+        isLoadingOps: false,
+        isLoadingPlanner: false,
+        isRunningOptimization: false,
+        optimizationProgress: 0,
+        sessionStatus: "ready",
+        guildName: nextGuildSummary?.name ?? state.guildName,
+        guildSummary: nextGuildSummary,
+        guildRosters,
+        opsDefinitions,
+        opsAnalysis,
+        guideTbOmicrons,
+        guideUnitCatalog,
+        plannerProjection,
+        plannerResult,
+        plannerSettings,
+        optimizerDirty: false,
+        optimizerStatusMessage: formatOptimizationCompletionStatus(plannerResult),
+        primaryAllyCode:
+          typeof record.primaryAllyCode === "string"
+            ? record.primaryAllyCode
+            : state.primaryAllyCode,
+        selectedAlgorithm:
+          typeof record.selectedAlgorithm === "string"
+            ? record.selectedAlgorithm
+            : plannerResult.selectedAlgorithm || state.selectedAlgorithm,
+        optimizerAcknowledged:
+          typeof record.optimizerAcknowledged === "boolean"
+            ? record.optimizerAcknowledged
+            : true,
+        selectedChain:
+          record.selectedChain === "ds" ||
+          record.selectedChain === "mx" ||
+          record.selectedChain === "ls"
+            ? record.selectedChain
+            : state.selectedChain,
+        selectedOperationsDay,
+        selectedOperationsPlanetId: resolveOperationsPlanet(
+          typeof record.selectedOperationsPlanetId === "string"
+            ? record.selectedOperationsPlanetId
+            : state.selectedOperationsPlanetId,
+          plannerResult,
+          opsAnalysis,
+          selectedOperationsDay,
+        ),
+        selectedGuideMember: hasRosterSelection(persistedGuideMember, guildRosters)
+          ? persistedGuideMember
+          : firstScannedMember,
+        selectedGuideMission: isPersistedGuideMission(record.selectedGuideMission)
+          ? record.selectedGuideMission
+          : state.selectedGuideMission,
+        expandedGuidePlanets: Array.isArray(record.expandedGuidePlanets)
+          ? record.expandedGuidePlanets.filter(
+              (entry): entry is string => typeof entry === "string",
+            )
+          : state.expandedGuidePlanets,
+        guideData: normalizeGuideData(record.guideData),
+        selectedRosterMemberId: hasRosterSelection(persistedRosterMember, guildRosters)
+          ? persistedRosterMember
+          : firstScannedMember,
+        rosterSearch:
+          typeof record.rosterSearch === "string"
+            ? record.rosterSearch
+            : state.rosterSearch,
+        rosterFilter:
+          typeof record.rosterFilter === "string"
+            ? record.rosterFilter
+            : state.rosterFilter,
+        rosterSortKey:
+          typeof record.rosterSortKey === "string"
+            ? record.rosterSortKey
+            : state.rosterSortKey,
+        lastSyncAt:
+          typeof record.savedAt === "string"
+            ? record.savedAt
+            : new Date().toISOString(),
+        lastError: null,
+        statusMessage:
+          typeof record.savedAt === "string"
+            ? `Snapshot loaded from ${new Date(record.savedAt).toLocaleString()}.`
+            : "Snapshot loaded.",
+      };
+    });
+
+    if (!opsDefinitions) {
+      await get().loadOpsDefinitions();
+    }
+    if (!opsAnalysis) {
+      await get().analyzePlatoons();
+    }
+    if (!plannerProjection) {
+      await get().refreshPlannerProjection();
+    }
+    await get().persistAppState();
   },
   setPrimaryAllyCode: (primaryAllyCode) => set({ primaryAllyCode }),
   setGuildName: (guildName) => set({ guildName }),
@@ -1343,6 +1662,75 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
       };
     });
     void get().refreshPlannerProjection();
+    void get().persistAppState();
+  },
+  setPlanetMissionOverride: (planetId, missionId, patch) => {
+    set((state) => {
+      const sanitizedPatch = sanitizeMissionOverridePatch(state.plannerSettings, patch);
+      const currentPlanetState = {
+        ...defaultPlanetPlannerState(),
+        ...state.plannerSettings.planetState[planetId],
+      };
+      const currentMissionState = {
+        ...defaultMissionOverrideState(),
+        ...currentPlanetState.missionOverrides[missionId],
+      };
+      return {
+        plannerSettings: {
+          ...state.plannerSettings,
+          planetState: {
+            ...state.plannerSettings.planetState,
+            [planetId]: {
+              ...currentPlanetState,
+              missionOverrides: {
+                ...currentPlanetState.missionOverrides,
+                [missionId]: {
+                  ...currentMissionState,
+                  ...sanitizedPatch,
+                },
+              },
+            },
+          },
+        },
+        ...invalidateOptimizerState(state),
+      };
+    });
+    void get().refreshPlannerProjection();
+    void get().persistAppState();
+  },
+  setPlanetHold: (planetId) => {
+    set((state) => ({
+      plannerSettings: {
+        ...state.plannerSettings,
+        planetHold: planetId
+          ? {
+              planetId,
+              days: state.plannerSettings.planetHold?.planetId === planetId
+                ? state.plannerSettings.planetHold.days
+                : 1,
+            }
+          : null,
+      },
+      ...invalidateOptimizerState(state),
+    }));
+    void get().persistAppState();
+  },
+  setPlanetHoldDays: (days) => {
+    set((state) => {
+      if (!state.plannerSettings.planetHold) {
+        return state;
+      }
+      return {
+        plannerSettings: {
+          ...state.plannerSettings,
+          planetHold: {
+            ...state.plannerSettings.planetHold,
+            days: clampNumber(Math.round(days || 1), 1, 6),
+          },
+        },
+        ...invalidateOptimizerState(state),
+      };
+    });
     void get().persistAppState();
   },
   applyMissionEstimatesToPlanner: () => {

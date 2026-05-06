@@ -1,15 +1,18 @@
 use crate::error::{CommandError, CommandResult};
 use crate::models::{
     BootstrapResponse, BulkRosterScanResponse, BulkScanGuildRostersRequest, ComlinkStatusResponse,
-    GuildImportRequest, GuildImportResponse, GuildMember, GuildRosters, GuildScanProgressEvent,
-    GuildSummary, GuideTbOmicron, GuideTbOmicronMap, GuideTbOmicronResponse,
-    ImportSessionRequest, ImportSessionResponse, LoadAppStateResponse, OpsDefinitions,
-    OpsDefinitionsResponse, PlannerOptimizationProgressEvent, PlannerOptimizationRequest,
-    PlannerOptimizationResponse, PlannerProjectionRequest, PlannerProjectionResponse,
-    PlannerReferenceResponse, PlatoonAnalysisEntry, PlatoonAnalysisMap, PlatoonAnalysisResponse,
-    PlatoonRequirement, PlatoonSlotAnalysis, ResetScanSessionResponse, RosterScanResponse,
-    SaveAppStateRequest, SaveAppStateResponse, ScanFailure, SessionSnapshot,
-    SimplifiedRosterUnit, SimplifiedSkillRow,
+    ExportPreviewDocument, ExportPreviewResponse, ExportPreviewTokenRequest, GuildImportRequest,
+    GuildImportResponse, GuildMember, GuildRosters, GuildScanProgressEvent, GuildSummary,
+    GuideTbOmicron, GuideTbOmicronMap, GuideTbOmicronResponse, GuideUnitCatalogEntry,
+    GuideUnitCatalogResponse, ImportSessionRequest, ImportSessionResponse, LoadAppStateResponse,
+    OpenExportPreviewRequest, OpenExportPreviewResponse, OpsDefinitions, OpsDefinitionsResponse,
+    PlannerOptimizationProgressEvent, PlannerOptimizationRequest, PlannerOptimizationResponse,
+    PlannerProjectionRequest, PlannerProjectionResponse, PlannerReferenceResponse,
+    PlatoonAnalysisEntry, PlatoonAnalysisMap, PlatoonAnalysisResponse, PlatoonRequirement,
+    PlatoonSlotAnalysis, ReleaseExportPreviewResponse, ResetScanSessionResponse,
+    RosterScanResponse, SaveAppStateRequest, SaveAppStateResponse, ScanFailure,
+    SessionSnapshot, SimplifiedRosterUnit, SimplifiedSkillRow, WriteExportBundleRequest,
+    WriteExportBundleResponse,
 };
 use crate::planner;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -21,7 +24,10 @@ use std::fs;
 use std::io::{BufRead, BufReader, Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::OnceLock;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    OnceLock,
+};
 use std::thread;
 use std::time::Duration;
 use tar::Archive;
@@ -48,6 +54,7 @@ const LEGACY_PLANNER_SOURCE: &str = include_str!("../../old code base/rote_plann
 const STATCALC_BRIDGE_SOURCE: &str = include_str!("../python/statcalc_bridge.py");
 static COMLINK_HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 static LEGACY_UNIT_DATA: OnceLock<LegacyUnitData> = OnceLock::new();
+static EXPORT_PREVIEW_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 struct GuildScanTaskResult {
     key: String,
@@ -135,9 +142,17 @@ struct BackendRuntime {
     known_character_defids: HashSet<String>,
     ops_defs_cache: Option<OpsDefinitions>,
     guide_tb_omicron_cache: Option<GuideTbOmicronMap>,
+    export_previews: HashMap<String, ExportPreviewSession>,
     comlink_binary: Option<PathBuf>,
     comlink_child: Option<Child>,
     localization_warmup_running: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ExportPreviewSession {
+    title: String,
+    initial_document_id: String,
+    documents: Vec<ExportPreviewDocument>,
 }
 
 #[derive(Default)]
@@ -606,8 +621,180 @@ pub async fn get_guide_tb_omicrons(
     })
 }
 
+pub async fn get_guide_unit_catalog(
+    app_handle: AppHandle,
+) -> CommandResult<GuideUnitCatalogResponse> {
+    let state = app_handle.state::<BackendState>();
+    let mut runtime = state.runtime.lock().await;
+    ensure_localization_maps(&app_handle, &mut runtime).await?;
+    let units = build_guide_unit_catalog(&runtime);
+    Ok(GuideUnitCatalogResponse {
+        status: String::from("ok"),
+        units,
+    })
+}
+
 pub async fn get_planner_reference() -> CommandResult<PlannerReferenceResponse> {
     Ok(planner::planner_reference())
+}
+
+pub async fn write_export_bundle(
+    app_handle: AppHandle,
+    request: WriteExportBundleRequest,
+) -> CommandResult<WriteExportBundleResponse> {
+    let root = comlink_dir(&app_handle)?.join("exports");
+    fs::create_dir_all(&root).map_err(|error| CommandError::new("path", error.to_string()))?;
+
+    let folder_name = sanitize_export_path_segment(&request.folder_name);
+    if folder_name.is_empty() {
+        return Err(CommandError::new(
+            "export",
+            String::from("The export folder name was empty."),
+        ));
+    }
+
+    let bundle_dir = root.join(folder_name);
+    if bundle_dir.exists() {
+        fs::remove_dir_all(&bundle_dir)
+            .map_err(|error| CommandError::new("export", error.to_string()))?;
+    }
+    fs::create_dir_all(&bundle_dir).map_err(|error| CommandError::new("export", error.to_string()))?;
+
+    let mut open_path = None::<PathBuf>;
+    let requested_open_name = sanitize_export_file_name(&request.open_file_name);
+
+    for file in request.files {
+        let file_name = sanitize_export_file_name(&file.name);
+        if file_name.is_empty() {
+            continue;
+        }
+        let path = bundle_dir.join(&file_name);
+        fs::write(&path, file.contents).map_err(|error| CommandError::new("export", error.to_string()))?;
+        if file_name == requested_open_name {
+            open_path = Some(path);
+        }
+    }
+
+    let files_written = fs::read_dir(&bundle_dir)
+        .map_err(|error| CommandError::new("export", error.to_string()))?
+        .filter_map(Result::ok)
+        .count();
+
+    let open_path = open_path.ok_or_else(|| {
+        CommandError::new(
+            "export",
+            String::from("The requested export launch file was not written."),
+        )
+    })?;
+
+    Ok(WriteExportBundleResponse {
+        directory: bundle_dir.to_string_lossy().into_owned(),
+        open_path: open_path.to_string_lossy().into_owned(),
+        files_written,
+    })
+}
+
+pub async fn open_export_preview(
+    app_handle: AppHandle,
+    request: OpenExportPreviewRequest,
+) -> CommandResult<OpenExportPreviewResponse> {
+    if request.documents.is_empty() {
+        return Err(CommandError::new(
+            "export_preview",
+            String::from("There was no export document to preview."),
+        ));
+    }
+
+    let token = format!(
+        "export_{}",
+        EXPORT_PREVIEW_COUNTER.fetch_add(1, Ordering::Relaxed)
+    );
+    let window_label = format!("export-preview-{token}");
+    let initial_document_id = if request.initial_document_id.trim().is_empty() {
+        request
+            .documents
+            .first()
+            .map(|document| document.id.clone())
+            .unwrap_or_default()
+    } else {
+        request.initial_document_id.trim().to_string()
+    };
+
+    {
+        let state = app_handle.state::<BackendState>();
+        let mut runtime = state.runtime.lock().await;
+        runtime.export_previews.insert(
+            token.clone(),
+            ExportPreviewSession {
+                title: request.title.clone(),
+                initial_document_id: initial_document_id.clone(),
+                documents: request.documents.clone(),
+            },
+        );
+        while runtime.export_previews.len() > 12 {
+            let oldest = runtime.export_previews.keys().next().cloned();
+            if let Some(oldest) = oldest {
+                runtime.export_previews.remove(&oldest);
+            } else {
+                break;
+            }
+        }
+    }
+
+    let preview_url = format!("index.html#/export-preview?token={token}");
+    let build_result = tauri::WebviewWindowBuilder::new(
+        &app_handle,
+        window_label.clone(),
+        tauri::WebviewUrl::App(preview_url.into()),
+    )
+    .title(&request.title)
+    .inner_size(1480.0, 940.0)
+    .resizable(true)
+    .focused(true)
+    .build();
+
+    if let Err(error) = build_result {
+        let state = app_handle.state::<BackendState>();
+        let mut runtime = state.runtime.lock().await;
+        runtime.export_previews.remove(&token);
+        return Err(CommandError::new("export_preview", error.to_string()));
+    }
+
+    Ok(OpenExportPreviewResponse { token, window_label })
+}
+
+pub async fn get_export_preview(
+    app_handle: AppHandle,
+    request: ExportPreviewTokenRequest,
+) -> CommandResult<ExportPreviewResponse> {
+    let state = app_handle.state::<BackendState>();
+    let runtime = state.runtime.lock().await;
+    let preview = runtime
+        .export_previews
+        .get(request.token.trim())
+        .cloned()
+        .ok_or_else(|| {
+            CommandError::new(
+                "export_preview",
+                String::from("The requested export preview is no longer available."),
+            )
+        })?;
+
+    Ok(ExportPreviewResponse {
+        title: preview.title,
+        initial_document_id: preview.initial_document_id,
+        documents: preview.documents,
+    })
+}
+
+pub async fn release_export_preview(
+    app_handle: AppHandle,
+    request: ExportPreviewTokenRequest,
+) -> CommandResult<ReleaseExportPreviewResponse> {
+    let state = app_handle.state::<BackendState>();
+    let mut runtime = state.runtime.lock().await;
+    let released = runtime.export_previews.remove(request.token.trim()).is_some();
+    Ok(ReleaseExportPreviewResponse { released })
 }
 
 pub async fn build_planner_projection(
@@ -1715,6 +1902,55 @@ fn build_guide_tb_omicron_map(runtime: &mut BackendRuntime) -> GuideTbOmicronMap
     result
 }
 
+fn build_guide_unit_catalog(runtime: &BackendRuntime) -> Vec<GuideUnitCatalogEntry> {
+    let legacy = legacy_unit_data();
+    let mut entries = HashMap::<String, GuideUnitCatalogEntry>::new();
+
+    let mut upsert = |def_id: &str, fallback_name: &str| {
+        let key = canonical_defid_key(def_id);
+        if key.is_empty() {
+            return;
+        }
+
+        let name = lookup_unit_name(runtime, def_id, fallback_name).trim().to_string();
+        if name.is_empty() || name == "(unknown)" {
+            return;
+        }
+
+        let next = GuideUnitCatalogEntry {
+            def_id: key.clone(),
+            name,
+            combat_type: infer_combat_type(runtime, def_id, None),
+        };
+
+        match entries.get(&key) {
+            Some(existing) if existing.name != existing.def_id || next.name == next.def_id => return,
+            _ => {}
+        }
+
+        entries.insert(key, next);
+    };
+
+    for (def_id, fallback_name) in &legacy.playable_names {
+        upsert(def_id, fallback_name);
+    }
+
+    for roster in runtime.guild_rosters.values() {
+        for unit in roster {
+            upsert(&unit.def_id, &unit.name);
+        }
+    }
+
+    let mut units = entries.into_values().collect::<Vec<_>>();
+    units.sort_by(|left, right| {
+        left.name
+            .to_lowercase()
+            .cmp(&right.name.to_lowercase())
+            .then(left.def_id.cmp(&right.def_id))
+    });
+    units
+}
+
 fn load_ops_definitions_internal(runtime: &mut BackendRuntime) -> CommandResult<OpsDefinitions> {
     if let Some(defs) = runtime.ops_defs_cache.clone() {
         return Ok(defs);
@@ -1860,6 +2096,36 @@ fn app_state_path(app_handle: &AppHandle) -> CommandResult<PathBuf> {
     Ok(comlink_dir(app_handle)?.join(APP_STATE_FILE))
 }
 
+fn sanitize_export_path_segment(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('_')
+        .to_string()
+}
+
+fn sanitize_export_file_name(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('_')
+        .to_string()
+}
+
 fn comlink_dir(app_handle: &AppHandle) -> CommandResult<PathBuf> {
     let dir = app_handle
         .path()
@@ -1927,6 +2193,9 @@ fn find_existing_comlink_binary(
 fn comlink_search_roots(app_handle: &AppHandle) -> Vec<PathBuf> {
     let mut roots = Vec::<PathBuf>::new();
     if let Ok(dir) = comlink_dir(app_handle) {
+        roots.push(dir);
+    }
+    if let Some(dir) = app_data_root_from_runtime_path_hint() {
         roots.push(dir);
     }
     if let Ok(current_dir) = std::env::current_dir() {

@@ -47,6 +47,57 @@ pub struct ImportSessionRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+pub struct ExportBundleFile {
+    pub name: String,
+    pub contents: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteExportBundleRequest {
+    pub folder_name: String,
+    pub open_file_name: String,
+    pub files: Vec<ExportBundleFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPreviewDocument {
+    pub id: String,
+    pub title: String,
+    pub html: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenExportPreviewRequest {
+    pub title: String,
+    pub initial_document_id: String,
+    pub documents: Vec<ExportPreviewDocument>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPreviewTokenRequest {
+    pub token: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PlannerMissionOverrideState {
+    pub rate_override: Option<f64>,
+    pub count_override: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PlannerPlanetHoldConfig {
+    pub planet_id: String,
+    pub days: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct PlannerPlanetState {
     pub cm_rate_override: Option<f64>,
     pub fleet_rate_override: Option<f64>,
@@ -55,6 +106,7 @@ pub struct PlannerPlanetState {
     pub preloaded: i64,
     pub sm_ready: bool,
     pub sm_count: i64,
+    pub mission_overrides: HashMap<String, PlannerMissionOverrideState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -71,6 +123,7 @@ pub struct PlannerSettings {
     pub fleet_falloff: f64,
     pub daily_undep: Vec<f64>,
     pub planet_state: HashMap<String, PlannerPlanetState>,
+    pub planet_hold: Option<PlannerPlanetHoldConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -515,6 +568,50 @@ pub struct GuideTbOmicronResponse {
     pub units: GuideTbOmicronMap,
     pub omicron_area: i64,
     pub area_label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GuideUnitCatalogEntry {
+    pub def_id: String,
+    pub name: String,
+    pub combat_type: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GuideUnitCatalogResponse {
+    pub status: String,
+    pub units: Vec<GuideUnitCatalogEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteExportBundleResponse {
+    pub directory: String,
+    pub open_path: String,
+    pub files_written: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenExportPreviewResponse {
+    pub token: String,
+    pub window_label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPreviewResponse {
+    pub title: String,
+    pub initial_document_id: String,
+    pub documents: Vec<ExportPreviewDocument>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseExportPreviewResponse {
+    pub released: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

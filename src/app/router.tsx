@@ -2,6 +2,7 @@ import { Navigate, createHashRouter } from "react-router-dom";
 import { LegacyPlannerLayout } from "../features/rotePlanner/LegacyPlannerLayout";
 import {
   DayByDayPlanPage,
+  ExportPreviewPage,
   GuidesPage,
   GuildOverviewPage,
   OperationsPage,
@@ -43,6 +44,10 @@ export const router = createHashRouter([
         element: <RosterPage />,
       },
     ],
+  },
+  {
+    path: "/export-preview",
+    element: <ExportPreviewPage />,
   },
   {
     path: "*",

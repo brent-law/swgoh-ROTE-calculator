@@ -1,8 +1,8 @@
 mod backend;
 mod commands;
 mod error;
-mod models;
-mod planner;
+pub mod models;
+pub mod planner;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,7 +20,12 @@ pub fn run() {
             commands::load_ops_definitions,
             commands::analyze_platoons,
             commands::get_guide_tb_omicrons,
+            commands::get_guide_unit_catalog,
             commands::get_planner_reference,
+            commands::write_export_bundle,
+            commands::open_export_preview,
+            commands::get_export_preview,
+            commands::release_export_preview,
             commands::build_planner_projection,
             commands::run_planner_optimization,
             commands::load_app_state,

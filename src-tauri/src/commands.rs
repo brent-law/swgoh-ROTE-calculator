@@ -2,11 +2,14 @@ use crate::backend;
 use crate::error::CommandResult;
 use crate::models::{
     BootstrapResponse, BulkRosterScanResponse, BulkScanGuildRostersRequest, ComlinkStatusResponse,
-    GuildImportRequest, GuildImportResponse, GuideTbOmicronResponse, ImportSessionRequest,
-    ImportSessionResponse, LoadAppStateResponse, OpsDefinitionsResponse, PlannerOptimizationRequest,
-    PlannerOptimizationResponse, PlannerProjectionRequest, PlannerProjectionResponse,
-    PlannerReferenceResponse, PlatoonAnalysisResponse, ResetScanSessionResponse,
+    ExportPreviewResponse, ExportPreviewTokenRequest, GuildImportRequest, GuildImportResponse,
+    GuideTbOmicronResponse, GuideUnitCatalogResponse, ImportSessionRequest, ImportSessionResponse,
+    LoadAppStateResponse, OpenExportPreviewRequest, OpenExportPreviewResponse,
+    OpsDefinitionsResponse, PlannerOptimizationRequest, PlannerOptimizationResponse,
+    PlannerProjectionRequest, PlannerProjectionResponse, PlannerReferenceResponse,
+    PlatoonAnalysisResponse, ReleaseExportPreviewResponse, ResetScanSessionResponse,
     RosterScanResponse, SaveAppStateRequest, SaveAppStateResponse, ScanRosterRequest,
+    WriteExportBundleRequest, WriteExportBundleResponse,
 };
 
 #[tauri::command]
@@ -77,8 +80,47 @@ pub async fn get_guide_tb_omicrons(
 }
 
 #[tauri::command]
+pub async fn get_guide_unit_catalog(
+    app_handle: tauri::AppHandle,
+) -> CommandResult<GuideUnitCatalogResponse> {
+    backend::get_guide_unit_catalog(app_handle).await
+}
+
+#[tauri::command]
 pub async fn get_planner_reference() -> CommandResult<PlannerReferenceResponse> {
     backend::get_planner_reference().await
+}
+
+#[tauri::command]
+pub async fn write_export_bundle(
+    app_handle: tauri::AppHandle,
+    request: WriteExportBundleRequest,
+) -> CommandResult<WriteExportBundleResponse> {
+    backend::write_export_bundle(app_handle, request).await
+}
+
+#[tauri::command]
+pub async fn open_export_preview(
+    app_handle: tauri::AppHandle,
+    request: OpenExportPreviewRequest,
+) -> CommandResult<OpenExportPreviewResponse> {
+    backend::open_export_preview(app_handle, request).await
+}
+
+#[tauri::command]
+pub async fn get_export_preview(
+    app_handle: tauri::AppHandle,
+    request: ExportPreviewTokenRequest,
+) -> CommandResult<ExportPreviewResponse> {
+    backend::get_export_preview(app_handle, request).await
+}
+
+#[tauri::command]
+pub async fn release_export_preview(
+    app_handle: tauri::AppHandle,
+    request: ExportPreviewTokenRequest,
+) -> CommandResult<ReleaseExportPreviewResponse> {
+    backend::release_export_preview(app_handle, request).await
 }
 
 #[tauri::command]

@@ -223,6 +223,15 @@ pub async fn shutdown_backend(app_handle: &AppHandle) {
     let _ = stop_comlink_internal(&mut runtime);
 }
 
+pub async fn release_export_preview_window(app_handle: &AppHandle, window_label: &str) {
+    let Some(token) = window_label.strip_prefix("export-preview-") else {
+        return;
+    };
+    let state = app_handle.state::<BackendState>();
+    let mut runtime = state.runtime.lock().await;
+    runtime.export_previews.remove(token);
+}
+
 fn emit_scan_progress(app_handle: &AppHandle, payload: GuildScanProgressEvent) {
     let _ = app_handle.emit(GUILD_SCAN_PROGRESS_EVENT, payload);
 }

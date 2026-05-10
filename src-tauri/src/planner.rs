@@ -11,7 +11,9 @@ use crate::models::{
     PlatoonRequirement,
 };
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
+use rayon::ThreadPoolBuilder;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const OPT_GENES: usize = 18;
@@ -135,6 +137,19 @@ struct PlanetPriority {
 struct OptimizationBest {
     genome: Vec<i64>,
     score: i64,
+}
+
+#[derive(Debug)]
+enum AlgorithmRunMessage {
+    Progress {
+        algorithm: String,
+        fraction: f64,
+        best_score: i64,
+    },
+    Complete {
+        algorithm: String,
+        result: OptimizationBest,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -480,36 +495,25 @@ pub fn run_optimizer(
         message: String::from("Preparing optimization run..."),
     });
 
-    let mut best_algorithm = algorithm_keys[0].to_string();
-    let mut best_result: Option<OptimizationBest> = None;
+    let (best_algorithm, best_result, score_entries) = if selected_algorithm == "all" {
+        run_all_algorithms_parallel(
+            &engine,
+            &algorithm_keys,
+            &selected_algorithm,
+            run_count,
+            &mut on_progress,
+        )
+    } else {
+        run_algorithms_serial(
+            &engine,
+            &algorithm_keys,
+            &selected_algorithm,
+            run_count,
+            &mut on_progress,
+        )
+    };
 
-    for (algorithm_idx, key) in algorithm_keys.iter().enumerate() {
-        let mut report_algorithm_progress = |algorithm_fraction: f64, best_score: i64| {
-            let bounded_fraction = algorithm_fraction.clamp(0.0, 1.0);
-            let overall_fraction = ((algorithm_idx as f64) + bounded_fraction) / run_count;
-            on_progress(PlannerOptimizationProgressEvent {
-                phase: String::from("progress"),
-                selected_algorithm: selected_algorithm.clone(),
-                algorithm: (*key).to_string(),
-                overall_fraction: overall_fraction.clamp(0.0, 1.0),
-                algorithm_fraction: bounded_fraction,
-                best_score,
-                message: optimization_progress_message(key, bounded_fraction, best_score),
-            });
-        };
-
-        report_algorithm_progress(0.0, best_result.as_ref().map(|result| result.score).unwrap_or(0));
-        let result = engine.run_algorithm(key, &mut report_algorithm_progress);
-        scores.push(score_entry(key, result.score));
-        if best_result
-            .as_ref()
-            .map(|current| result.score > current.score)
-            .unwrap_or(true)
-        {
-            best_algorithm = (*key).to_string();
-            best_result = Some(result);
-        }
-    }
+    scores.extend(score_entries);
 
     let best = best_result.unwrap_or_else(|| engine.run_greedy(&mut |_, _| {}));
 
@@ -566,6 +570,223 @@ pub fn run_optimizer(
     });
 
     response
+}
+
+fn run_algorithms_serial(
+    engine: &PlannerEngine,
+    algorithm_keys: &[&str],
+    selected_algorithm: &str,
+    run_count: f64,
+    on_progress: &mut dyn FnMut(PlannerOptimizationProgressEvent),
+) -> (String, Option<OptimizationBest>, Vec<PlannerAlgorithmScore>) {
+    let mut best_algorithm = algorithm_keys[0].to_string();
+    let mut best_result: Option<OptimizationBest> = None;
+    let mut scores = Vec::<PlannerAlgorithmScore>::new();
+
+    for (algorithm_idx, key) in algorithm_keys.iter().enumerate() {
+        let mut report_algorithm_progress = |algorithm_fraction: f64, best_score: i64| {
+            let bounded_fraction = algorithm_fraction.clamp(0.0, 1.0);
+            let overall_fraction = ((algorithm_idx as f64) + bounded_fraction) / run_count;
+            on_progress(PlannerOptimizationProgressEvent {
+                phase: String::from("progress"),
+                selected_algorithm: selected_algorithm.to_string(),
+                algorithm: (*key).to_string(),
+                overall_fraction: overall_fraction.clamp(0.0, 1.0),
+                algorithm_fraction: bounded_fraction,
+                best_score,
+                message: optimization_progress_message(key, bounded_fraction, best_score),
+            });
+        };
+
+        report_algorithm_progress(0.0, best_result.as_ref().map(|result| result.score).unwrap_or(0));
+        let result = engine.run_algorithm(key, &mut report_algorithm_progress);
+        scores.push(score_entry(key, result.score));
+        if best_result
+            .as_ref()
+            .map(|current| result.score > current.score)
+            .unwrap_or(true)
+        {
+            best_algorithm = (*key).to_string();
+            best_result = Some(result);
+        }
+    }
+
+    (best_algorithm, best_result, scores)
+}
+
+fn run_all_algorithms_parallel(
+    engine: &PlannerEngine,
+    algorithm_keys: &[&str],
+    selected_algorithm: &str,
+    run_count: f64,
+    on_progress: &mut dyn FnMut(PlannerOptimizationProgressEvent),
+) -> (String, Option<OptimizationBest>, Vec<PlannerAlgorithmScore>) {
+    let thread_count = std::thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(1)
+        .max(1);
+    let algorithm_names = algorithm_keys
+        .iter()
+        .map(|key| (*key).to_string())
+        .collect::<Vec<_>>();
+    let max_parallel_algorithms =
+        suggested_all_mode_workers(thread_count, algorithm_names.len()).max(1);
+    if max_parallel_algorithms <= 1 {
+        return run_algorithms_serial(
+            engine,
+            algorithm_keys,
+            selected_algorithm,
+            run_count,
+            on_progress,
+        );
+    }
+    let progress_state = algorithm_names
+        .iter()
+        .map(|name| (name.clone(), (0.0f64, 0i64)))
+        .collect::<HashMap<_, _>>();
+    let prioritized_algorithms = prioritized_all_mode_algorithms(&algorithm_names);
+    let queue = Arc::new(Mutex::new(
+        prioritized_algorithms.into_iter().collect::<VecDeque<_>>(),
+    ));
+    let (tx, rx) = mpsc::channel::<AlgorithmRunMessage>();
+    let thread_budget = thread_count.saturating_sub(max_parallel_algorithms);
+    let base_pool_threads = (thread_budget / max_parallel_algorithms).max(1);
+    let extra_pool_threads = thread_budget % max_parallel_algorithms;
+    let mut workers = Vec::<std::thread::JoinHandle<()>>::new();
+    for worker_idx in 0..max_parallel_algorithms {
+        let tx = tx.clone();
+        let queue = Arc::clone(&queue);
+        let engine_for_worker = engine.clone();
+        let pool_threads = base_pool_threads + usize::from(worker_idx < extra_pool_threads);
+        workers.push(std::thread::spawn(move || {
+            let pool = ThreadPoolBuilder::new().num_threads(pool_threads.max(1)).build().ok();
+            loop {
+                let algorithm = {
+                    let mut work_queue = queue.lock().unwrap();
+                    work_queue.pop_front()
+                };
+                let Some(algorithm) = algorithm else {
+                    break;
+                };
+                let runner = || {
+                    let algorithm_name = algorithm.clone();
+                    let mut report_progress = |fraction: f64, best_score: i64| {
+                        let _ = tx.send(AlgorithmRunMessage::Progress {
+                            algorithm: algorithm_name.clone(),
+                            fraction,
+                            best_score,
+                        });
+                    };
+                    report_progress(0.0, 0);
+                    let result = engine_for_worker.run_algorithm(&algorithm, &mut report_progress);
+                    let _ = tx.send(AlgorithmRunMessage::Complete { algorithm, result });
+                };
+                if let Some(pool) = pool.as_ref() {
+                    pool.install(runner);
+                } else {
+                    runner();
+                }
+            }
+        }));
+    }
+    drop(tx);
+
+    let mut progress_state = progress_state;
+    let mut best_algorithm = algorithm_names[0].clone();
+    let mut best_result: Option<OptimizationBest> = None;
+    let mut completed_scores = HashMap::<String, i64>::new();
+
+    while completed_scores.len() < algorithm_names.len() {
+        let Ok(message) = rx.recv() else {
+            break;
+        };
+        match message {
+            AlgorithmRunMessage::Progress {
+                algorithm,
+                fraction,
+                best_score,
+            } => {
+                let bounded_fraction = fraction.clamp(0.0, 1.0);
+                progress_state.insert(algorithm.clone(), (bounded_fraction, best_score));
+                let overall_fraction = progress_state
+                    .values()
+                    .map(|(entry_fraction, _)| *entry_fraction)
+                    .sum::<f64>()
+                    / run_count;
+                let global_best = progress_state
+                    .values()
+                    .map(|(_, score)| *score)
+                    .chain(best_result.iter().map(|result| result.score))
+                    .max()
+                    .unwrap_or(0);
+                on_progress(PlannerOptimizationProgressEvent {
+                    phase: String::from("progress"),
+                    selected_algorithm: selected_algorithm.to_string(),
+                    algorithm: algorithm.clone(),
+                    overall_fraction: overall_fraction.clamp(0.0, 1.0),
+                    algorithm_fraction: bounded_fraction,
+                    best_score: global_best,
+                    message: optimization_progress_message(
+                        &algorithm,
+                        bounded_fraction,
+                        best_score.max(global_best),
+                    ),
+                });
+            }
+            AlgorithmRunMessage::Complete { algorithm, result } => {
+                progress_state.insert(algorithm.clone(), (1.0, result.score));
+                completed_scores.insert(algorithm.clone(), result.score);
+                if best_result
+                    .as_ref()
+                    .map(|current| result.score > current.score)
+                    .unwrap_or(true)
+                {
+                    best_algorithm = algorithm;
+                    best_result = Some(result);
+                }
+            }
+        }
+    }
+
+    for worker in workers {
+        let _ = worker.join();
+    }
+
+    let scores = algorithm_names
+        .iter()
+        .map(|algorithm| {
+            let score = completed_scores.get(algorithm).copied().unwrap_or(0);
+            score_entry(algorithm, score)
+        })
+        .collect::<Vec<_>>();
+
+    (best_algorithm, best_result, scores)
+}
+
+fn suggested_all_mode_workers(available_threads: usize, algorithm_count: usize) -> usize {
+    if algorithm_count <= 1 {
+        return algorithm_count;
+    }
+    if available_threads >= 24 {
+        algorithm_count.min(3)
+    } else if available_threads >= 16 {
+        algorithm_count.min(2)
+    } else {
+        1
+    }
+}
+
+fn prioritized_all_mode_algorithms(algorithm_names: &[String]) -> Vec<String> {
+    let mut ordered = algorithm_names.to_vec();
+    ordered.sort_by_key(|algorithm| match normalize_algorithm(algorithm).as_str() {
+        "sa" => 0,
+        "ga" => 1,
+        "pso" => 2,
+        "adam" => 3,
+        "greedy" => 4,
+        _ => 9,
+    });
+    ordered
 }
 
 pub fn benchmark_eval_batch(

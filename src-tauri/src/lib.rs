@@ -37,17 +37,23 @@ pub fn run() {
         .expect("error while building tauri application");
 
     app.run(|app_handle, event| match event {
-        tauri::RunEvent::WindowEvent {
-            event: tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed,
-            ..
-        } => {
-            tauri::async_runtime::block_on(backend::shutdown_backend(app_handle));
-        }
         tauri::RunEvent::ExitRequested { .. } => {
             tauri::async_runtime::block_on(backend::shutdown_backend(app_handle));
         }
         tauri::RunEvent::Exit => {
             tauri::async_runtime::block_on(backend::shutdown_backend(app_handle));
+        }
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::Destroyed,
+            ..
+        } => {
+            if label.starts_with("export-preview-") {
+                tauri::async_runtime::block_on(backend::release_export_preview_window(
+                    app_handle,
+                    &label,
+                ));
+            }
         }
         _ => {}
     });

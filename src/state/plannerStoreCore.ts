@@ -30,6 +30,14 @@ import {
 
 export type SessionStatus = "idle" | "syncing" | "ready";
 
+const GUIDE_MISSION_LIMIT = 20;
+
+type GuideMutationResult = {
+  ok: boolean;
+  count: number;
+  reason?: string;
+};
+
 const offlineComlinkStatus: ComlinkStatus = {
   comlink: "offline",
   port: 3000,
@@ -164,7 +172,14 @@ export type PlannerStore = {
     planetId: string,
     missionId: string,
     squad: Omit<GuideSquad, "order">,
-  ) => void;
+  ) => GuideMutationResult;
+  copyGuideSquad: (
+    sourcePlanetId: string,
+    sourceMissionId: string,
+    squadId: string,
+    targetPlanetId: string,
+    targetMissionId: string,
+  ) => GuideMutationResult;
   moveGuideSquad: (planetId: string, missionId: string, squadId: string, delta: number) => void;
   deleteGuideSquad: (planetId: string, missionId: string, squadId: string) => void;
   importGuideData: (guideData: unknown) => Promise<void>;
@@ -247,6 +262,12 @@ function normalizeGuideOmicronRequirement(
 
 function createGuideSquadId() {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function sortGuideSquads(squads: GuideSquad[]) {
+  return squads
+    .map((entry, index) => ({ ...entry, order: index }))
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
 }
 
 function normalizeGuideSquad(value: unknown): GuideSquad {
@@ -1811,10 +1832,25 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
     void get().persistAppState();
   },
   saveGuideSquad: (planetId, missionId, squad) => {
+    let result: GuideMutationResult = {
+      ok: false,
+      count: 0,
+      reason: "Guide squad could not be saved.",
+    };
     set((state) => {
       const missionKey = guideMissionKey(planetId, missionId);
       const existing = state.guideData.squads[missionKey] ?? [];
       const existingIndex = existing.findIndex((entry) => entry.id === squad.id);
+      if (existingIndex < 0 && existing.length >= GUIDE_MISSION_LIMIT) {
+        result = {
+          ok: false,
+          count: existing.length,
+          reason: `This mission has reached the ${GUIDE_MISSION_LIMIT}-guide limit.`,
+        };
+        return {
+          statusMessage: result.reason,
+        };
+      }
       const order =
         existingIndex >= 0
           ? existing[existingIndex]?.order ?? existingIndex
@@ -1827,21 +1863,88 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
         existingIndex >= 0
           ? existing.map((entry, index) => (index === existingIndex ? normalized : entry))
           : [...existing, normalized];
+      const sortedSquads = sortGuideSquads(nextMissionSquads);
+      result = {
+        ok: true,
+        count: sortedSquads.length,
+      };
 
       return {
         guideData: {
           ...state.guideData,
           squads: {
             ...state.guideData.squads,
-            [missionKey]: nextMissionSquads
-              .map((entry, index) => ({ ...entry, order: index }))
-              .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id)),
+            [missionKey]: sortedSquads,
           },
         },
         statusMessage: "Guide squad saved.",
       };
     });
-    void get().persistAppState();
+    if (result.ok) {
+      void get().persistAppState();
+    }
+    return result;
+  },
+  copyGuideSquad: (sourcePlanetId, sourceMissionId, squadId, targetPlanetId, targetMissionId) => {
+    let result: GuideMutationResult = {
+      ok: false,
+      count: 0,
+      reason: "Guide squad could not be copied.",
+    };
+    set((state) => {
+      const sourceMissionKey = guideMissionKey(sourcePlanetId, sourceMissionId);
+      const targetMissionKey = guideMissionKey(targetPlanetId, targetMissionId);
+      const sourceSquad =
+        state.guideData.squads[sourceMissionKey]?.find((entry) => entry.id === squadId) ?? null;
+      if (!sourceSquad) {
+        result = {
+          ok: false,
+          count: state.guideData.squads[targetMissionKey]?.length ?? 0,
+          reason: "The selected guide squad could not be found.",
+        };
+        return {
+          statusMessage: result.reason,
+        };
+      }
+
+      const existing = state.guideData.squads[targetMissionKey] ?? [];
+      if (existing.length >= GUIDE_MISSION_LIMIT) {
+        result = {
+          ok: false,
+          count: existing.length,
+          reason: `The target mission has reached the ${GUIDE_MISSION_LIMIT}-guide limit.`,
+        };
+        return {
+          statusMessage: result.reason,
+        };
+      }
+
+      const copiedSquad = normalizeGuideSquad({
+        ...sourceSquad,
+        id: createGuideSquadId(),
+        order: existing.length,
+      });
+      const sortedSquads = sortGuideSquads([...existing, copiedSquad]);
+      result = {
+        ok: true,
+        count: sortedSquads.length,
+      };
+
+      return {
+        guideData: {
+          ...state.guideData,
+          squads: {
+            ...state.guideData.squads,
+            [targetMissionKey]: sortedSquads,
+          },
+        },
+        statusMessage: "Guide squad copied.",
+      };
+    });
+    if (result.ok) {
+      void get().persistAppState();
+    }
+    return result;
   },
   moveGuideSquad: (planetId, missionId, squadId, delta) => {
     set((state) => {

@@ -512,6 +512,7 @@ type GuideRosterCheck = {
 
 const GUIDE_FLEET_STARTER_COUNT = 3;
 const GUIDE_TB_OMICRON_AREA = 7;
+const GUIDE_MISSION_LIMIT = 20;
 const CAPITAL_SHIP_DEFIDS = new Set([
   "CAPITALCHIMAERA",
   "CHIMAERA",
@@ -541,6 +542,11 @@ const CAPITAL_SHIP_DEFIDS = new Set([
 
 function guideMissionKey(planetId: string, missionId: string) {
   return `${planetId}___${missionId}`;
+}
+
+function guideMissionCopyGroup(mission: PlannerMissionDefinition) {
+  if (mission.unlocks) return "unlock";
+  return mission.missionType;
 }
 
 function normalizeGuideUnitName(value: string) {
@@ -1576,6 +1582,152 @@ function GuideEditorModal({
   return createPortal(modal, document.body);
 }
 
+type GuideCopyMissionOption = {
+  planetId: string;
+  planetName: string;
+  missionId: string;
+  missionLabel: string;
+  squadCount: number;
+};
+
+type GuideCopyModalProps = {
+  squad: GuideSquad;
+  sourcePlanetName: string;
+  sourceMissionLabel: string;
+  targetPlanetId: string;
+  targetMissionId: string;
+  targetPlanets: Array<{ id: string; name: string }>;
+  targetMissions: GuideCopyMissionOption[];
+  onPlanetChange: (planetId: string) => void;
+  onMissionChange: (missionId: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+};
+
+function GuideCopyModal({
+  squad,
+  sourcePlanetName,
+  sourceMissionLabel,
+  targetPlanetId,
+  targetMissionId,
+  targetPlanets,
+  targetMissions,
+  onPlanetChange,
+  onMissionChange,
+  onClose,
+  onConfirm,
+}: GuideCopyModalProps) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose]);
+
+  const modal = (
+    <div
+      className={styles.modalBackdrop}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className={styles.modalCard} onClick={(event) => event.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <div>
+            <div className={styles.modalTitle}>Copy Guide</div>
+            <div className={styles.noteText}>
+              {sourcePlanetName} - {sourceMissionLabel}
+            </div>
+          </div>
+          <button type="button" className={styles.closeButton} onClick={onClose}>
+            X
+          </button>
+        </div>
+
+        <div className={styles.squadSection}>
+          <div className={styles.squadSectionLabel}>Copying Squad</div>
+          <div className={styles.squadSectionValue}>{squad.leader || "Unnamed Squad"}</div>
+        </div>
+
+        <label className={styles.modalField}>
+          <span className={styles.label}>Target Planet</span>
+          <select
+            className={styles.selectControl}
+            value={targetPlanetId}
+            onChange={(event) => onPlanetChange(event.currentTarget.value)}
+          >
+            {targetPlanets.length ? (
+              targetPlanets.map((planet) => (
+                <option key={planet.id} value={planet.id}>
+                  {planet.name}
+                </option>
+              ))
+            ) : (
+              <option value="">No eligible target planets</option>
+            )}
+          </select>
+        </label>
+
+        <label className={styles.modalField}>
+          <span className={styles.label}>Target Mission</span>
+          <select
+            className={styles.selectControl}
+            value={targetMissionId}
+            onChange={(event) => onMissionChange(event.currentTarget.value)}
+            disabled={!targetMissions.length}
+          >
+            {targetMissions.length ? (
+              targetMissions.map((mission) => (
+                <option key={`${mission.planetId}-${mission.missionId}`} value={mission.missionId}>
+                  {mission.missionLabel} ({mission.squadCount}/{GUIDE_MISSION_LIMIT})
+                </option>
+              ))
+            ) : (
+              <option value="">No eligible target missions</option>
+            )}
+          </select>
+        </label>
+
+        <div className={styles.fieldHint}>
+          Guides can only be copied to the same mission type on a different planet.
+        </div>
+
+        <div className={styles.modalFooter}>
+          <div className={styles.modalFooterCopy}>
+            This keeps the squad composition, notes, omicrons, and YouTube link intact.
+          </div>
+          <button type="button" className={styles.secondaryButton} onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={onConfirm}
+            disabled={!targetPlanetId || !targetMissionId || !targetMissions.length}
+          >
+            Copy Guide
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return createPortal(modal, document.body);
+}
+
 function triggerJsonDownload(filename: string, payload: unknown) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
@@ -2297,11 +2449,10 @@ export function ExportPreviewPage() {
   };
 
   const handleClose = () => {
-    void releasePreview().finally(() => {
-      void getCurrentWebviewWindow()
-        .close()
-        .catch(() => window.close());
-    });
+    void releasePreview();
+    void getCurrentWebviewWindow()
+      .close()
+      .catch(() => window.close());
   };
 
   return (
@@ -3370,6 +3521,7 @@ export function GuidesPage() {
   const setSelectedGuideMission = usePlannerStore((state) => state.setSelectedGuideMission);
   const toggleGuidePlanet = usePlannerStore((state) => state.toggleGuidePlanet);
   const saveGuideSquad = usePlannerStore((state) => state.saveGuideSquad);
+  const copyGuideSquad = usePlannerStore((state) => state.copyGuideSquad);
   const moveGuideSquad = usePlannerStore((state) => state.moveGuideSquad);
   const deleteGuideSquad = usePlannerStore((state) => state.deleteGuideSquad);
   const importGuideData = usePlannerStore((state) => state.importGuideData);
@@ -3380,6 +3532,9 @@ export function GuidesPage() {
   const [guideStatus, setGuideStatus] = useState("");
   const [editingSquadId, setEditingSquadId] = useState<string | null>(null);
   const [expandedSquads, setExpandedSquads] = useState<Record<string, boolean>>({});
+  const [copyingSquadId, setCopyingSquadId] = useState<string | null>(null);
+  const [copyTargetPlanetId, setCopyTargetPlanetId] = useState("");
+  const [copyTargetMissionId, setCopyTargetMissionId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scannedMembers = buildRosterMembers(guildSummary, guildRosters);
@@ -3403,6 +3558,9 @@ export function GuidesPage() {
     scannedMembers.find((member) => member.id === selectedGuideMember)?.label ??
     "No scanned member selected";
   const selectedRoster = selectedGuideMember ? guildRosters[selectedGuideMember] ?? null : null;
+  const scannedRosters = Object.values(guildRosters).filter(
+    (roster): roster is SimplifiedRosterUnit[] => Array.isArray(roster),
+  );
   const guideUnitLookup = buildGuideUnitLookup(guideUnitCatalog, guildRosters);
   const guideUnits = Array.from(guideUnitLookup.values()).sort((left, right) =>
     left.name.localeCompare(right.name),
@@ -3416,20 +3574,104 @@ export function GuidesPage() {
   const editingSquad = editingSquadId
     ? savedSquads.find((squad) => squad.id === editingSquadId) ?? null
     : null;
+  const copyingSquad = copyingSquadId
+    ? savedSquads.find((squad) => squad.id === copyingSquadId) ?? null
+    : null;
+  const guideMissionCounts = Object.fromEntries(
+    Object.entries(guideData.squads).map(([missionKey, squads]) => [missionKey, squads.length]),
+  ) as Record<string, number>;
+  const guideSaveBlocked = Object.values(guideMissionCounts).some(
+    (count) => count > GUIDE_MISSION_LIMIT,
+  );
+  const activeMissionCount = activeMissionKey ? guideMissionCounts[activeMissionKey] ?? 0 : 0;
+  const activeMissionAtLimit = activeMissionCount >= GUIDE_MISSION_LIMIT;
+  const activeMissionOverLimit = activeMissionCount > GUIDE_MISSION_LIMIT;
+  const copyMissionOptions =
+    activeMission && activePlanet
+      ? allPlanets.flatMap((planet) =>
+          planet.id === activePlanet.id
+            ? []
+            : planet.missions
+                .filter(
+                  (mission) =>
+                    guideMissionCopyGroup(mission) === guideMissionCopyGroup(activeMission) &&
+                    (guideMissionCounts[guideMissionKey(planet.id, mission.id)] ?? 0) <
+                      GUIDE_MISSION_LIMIT,
+                )
+                .map((mission) => ({
+                  planetId: planet.id,
+                  planetName: planet.name,
+                  missionId: mission.id,
+                  missionLabel: mission.label,
+                  squadCount: guideMissionCounts[guideMissionKey(planet.id, mission.id)] ?? 0,
+                })),
+        )
+      : [];
+  const copyTargetPlanets = Array.from(
+    new Map(copyMissionOptions.map((mission) => [mission.planetId, mission.planetName])).entries(),
+  ).map(([id, name]) => ({ id, name }));
+  const copyTargetMissions = copyMissionOptions.filter(
+    (mission) => mission.planetId === copyTargetPlanetId,
+  );
 
   const handleCloseGuideEditor = () => {
     setEditingSquadId(null);
     closeGuideEditor();
   };
 
+  const closeCopyGuideModal = () => {
+    setCopyingSquadId(null);
+    setCopyTargetPlanetId("");
+    setCopyTargetMissionId("");
+  };
+
+  useEffect(() => {
+    if (!copyingSquad) {
+      return;
+    }
+    const firstPlanetId = copyTargetPlanets[0]?.id ?? "";
+    const nextPlanetId =
+      copyTargetPlanetId && copyTargetPlanets.some((planet) => planet.id === copyTargetPlanetId)
+        ? copyTargetPlanetId
+        : firstPlanetId;
+    if (nextPlanetId !== copyTargetPlanetId) {
+      setCopyTargetPlanetId(nextPlanetId);
+      return;
+    }
+    const missionsForPlanet = copyMissionOptions.filter((mission) => mission.planetId === nextPlanetId);
+    const nextMissionId =
+      copyTargetMissionId && missionsForPlanet.some((mission) => mission.missionId === copyTargetMissionId)
+        ? copyTargetMissionId
+        : missionsForPlanet[0]?.missionId ?? "";
+    if (nextMissionId !== copyTargetMissionId) {
+      setCopyTargetMissionId(nextMissionId);
+    }
+  }, [
+    copyMissionOptions,
+    copyTargetMissionId,
+    copyTargetPlanetId,
+    copyTargetPlanets,
+    copyingSquad,
+  ]);
+
   const openNewGuideEditor = () => {
     if (!activePlanet || !activeMission) return;
+    if (activeMissionAtLimit) {
+      setGuideStatus(`This mission has reached the ${GUIDE_MISSION_LIMIT}-guide limit.`);
+      return;
+    }
     setEditingSquadId(null);
     setGuideEditorDifficulty("auto");
     openGuideEditor("auto");
   };
 
   const openGuideEditorForMission = (planetId: string, missionId: string) => {
+    const missionKey = guideMissionKey(planetId, missionId);
+    if ((guideMissionCounts[missionKey] ?? 0) >= GUIDE_MISSION_LIMIT) {
+      setSelectedGuideMission(planetId, missionId);
+      setGuideStatus(`This mission has reached the ${GUIDE_MISSION_LIMIT}-guide limit.`);
+      return;
+    }
     setSelectedGuideMission(planetId, missionId);
     setEditingSquadId(null);
     setGuideEditorDifficulty("auto");
@@ -3450,7 +3692,17 @@ export function GuidesPage() {
     }));
   };
 
+  const openCopyGuideModal = (squad: GuideSquad) => {
+    setCopyingSquadId(squad.id);
+  };
+
   const exportGuideFile = () => {
+    if (guideSaveBlocked) {
+      setGuideStatus(
+        `Guide save is disabled while any mission is over the ${GUIDE_MISSION_LIMIT}-guide limit.`,
+      );
+      return;
+    }
     triggerJsonDownload("rote-guide.json", guideData);
     setGuideStatus(`Guide exported - ${Object.keys(guideData.squads).length} mission entries.`);
   };
@@ -3480,7 +3732,7 @@ export function GuidesPage() {
     if (!activePlanet || !activeMission) return;
     const squadId =
       payload.id ?? `guide_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-    saveGuideSquad(activePlanet.id, activeMission.id, {
+    const result = saveGuideSquad(activePlanet.id, activeMission.id, {
       id: squadId,
       leader: payload.leader,
       leaderDefId: payload.leaderDefId,
@@ -3491,12 +3743,40 @@ export function GuidesPage() {
       requiredTbOmicrons: payload.requiredTbOmicrons,
       difficulty: payload.difficulty,
     });
+    if (!result.ok) {
+      setGuideStatus(result.reason ?? "Guide squad could not be saved.");
+      return;
+    }
     setExpandedSquads((current) => ({
       ...current,
       [squadId]: true,
     }));
     setGuideStatus(payload.id ? "Guide squad updated." : "Guide squad saved for the selected mission.");
     handleCloseGuideEditor();
+  };
+
+  const handleCopyGuide = () => {
+    if (!activePlanet || !activeMission || !copyingSquad || !copyTargetPlanetId || !copyTargetMissionId) {
+      return;
+    }
+    const result = copyGuideSquad(
+      activePlanet.id,
+      activeMission.id,
+      copyingSquad.id,
+      copyTargetPlanetId,
+      copyTargetMissionId,
+    );
+    if (!result.ok) {
+      setGuideStatus(result.reason ?? "Guide squad could not be copied.");
+      return;
+    }
+    const targetMission = copyTargetMissions.find(
+      (mission) => mission.missionId === copyTargetMissionId,
+    );
+    setGuideStatus(
+      `Guide copied to ${targetMission?.planetName ?? "target planet"} - ${targetMission?.missionLabel ?? "target mission"}.`,
+    );
+    closeCopyGuideModal();
   };
 
   return (
@@ -3523,7 +3803,17 @@ export function GuidesPage() {
         </div>
 
         <div className={styles.actionRow}>
-          <button type="button" className={styles.secondaryButton} onClick={exportGuideFile}>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={exportGuideFile}
+            disabled={guideSaveBlocked}
+            title={
+              guideSaveBlocked
+                ? `Reduce any mission over ${GUIDE_MISSION_LIMIT} guides before saving.`
+                : "Save Guide"
+            }
+          >
             Save Guide
           </button>
           <button
@@ -3544,6 +3834,11 @@ export function GuidesPage() {
       </div>
 
       {guideStatus ? <div className={styles.guideStatusLine}>{guideStatus}</div> : null}
+      {guideSaveBlocked ? (
+        <div className={styles.guideLimitNotice}>
+          Guide save is disabled while any mission is over the {GUIDE_MISSION_LIMIT}-guide limit.
+        </div>
+      ) : null}
 
       <div className={styles.guideLayout}>
         <aside className={styles.guideSidebar}>
@@ -3582,6 +3877,7 @@ export function GuidesPage() {
                         {planet.missions.map((mission) => {
                           const missionKey = guideMissionKey(planet.id, mission.id);
                           const missionSquadCount = guideData.squads[missionKey]?.length ?? 0;
+                          const missionAtLimit = missionSquadCount >= GUIDE_MISSION_LIMIT;
                           const active =
                             activePlanet?.id === planet.id && activeMission?.id === mission.id;
                           return (
@@ -3602,8 +3898,18 @@ export function GuidesPage() {
                                       ? "FL"
                                       : "CM"}
                               </span>
-                              <span className={styles.guideMissionLabel}>{mission.label}</span>
-                              <span className={styles.guidePlanetCount}>
+                              <span
+                                className={`${styles.guideMissionLabel} ${
+                                  missionAtLimit ? styles.guideMissionLabelAtLimit : ""
+                                }`}
+                              >
+                                {mission.label}
+                              </span>
+                              <span
+                                className={`${styles.guidePlanetCount} ${
+                                  missionAtLimit ? styles.guidePlanetCountAtLimit : ""
+                                }`}
+                              >
                                 {missionSquadCount > 0 ? missionSquadCount : ""}
                               </span>
                               <span
@@ -3650,8 +3956,25 @@ export function GuidesPage() {
                     <div className={styles.noteText}>{activeMission.note}</div>
                   ) : null}
                   <div className={styles.noteText}>Viewing for: {selectedMemberLabel}</div>
+                  {activeMissionAtLimit ? (
+                    <div className={styles.guideLimitNotice}>
+                      {activeMissionOverLimit
+                        ? `This mission is over the ${GUIDE_MISSION_LIMIT}-guide limit. Remove unused guides before saving.`
+                        : `This mission has reached the ${GUIDE_MISSION_LIMIT}-guide capacity.`}
+                    </div>
+                  ) : null}
                 </div>
-                <button type="button" className={styles.primaryButton} onClick={openNewGuideEditor}>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={openNewGuideEditor}
+                  disabled={activeMissionAtLimit}
+                  title={
+                    activeMissionAtLimit
+                      ? `This mission has reached the ${GUIDE_MISSION_LIMIT}-guide limit.`
+                      : "Add Squad"
+                  }
+                >
                   Add Squad
                 </button>
               </div>
@@ -3666,6 +3989,10 @@ export function GuidesPage() {
                   );
                   const expanded = expandedSquads[squad.id] ?? false;
                   const watchUrl = normalizeGuideVideoUrl(squad.videoUrl);
+                  const guildReadyCount = scannedRosters.reduce((total, roster) => {
+                    const check = buildGuideRosterCheck(squad, roster, activeMission, activePlanet);
+                    return total + (check?.ok ? 1 : 0);
+                  }, 0);
                   const compositionEntries = [squad.leader, ...squad.members.map((entry) => entry.trim())]
                     .filter(Boolean)
                     .join(", ");
@@ -3695,6 +4022,17 @@ export function GuidesPage() {
                             ) : (
                               <span className={styles.guidePlanetCount}>No roster check</span>
                             )}
+                            <span
+                              className={
+                                scannedRosters.length
+                                  ? styles.guideGuildReady
+                                  : styles.guideGuildReadyMuted
+                              }
+                            >
+                              {scannedRosters.length
+                                ? `Guild Ready ${guildReadyCount}/${scannedRosters.length}`
+                                : "Guild Ready n/a"}
+                            </span>
                           </div>
                         </div>
 
@@ -3812,6 +4150,19 @@ export function GuidesPage() {
                             <button
                               type="button"
                               className={styles.secondaryButton}
+                              onClick={() => openCopyGuideModal(squad)}
+                              disabled={!copyMissionOptions.length}
+                              title={
+                                copyMissionOptions.length
+                                  ? "Copy this guide to another eligible mission"
+                                  : "No eligible target missions are available"
+                              }
+                            >
+                              Copy to
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.secondaryButton}
                               onClick={() => openExistingGuideEditor(squad)}
                             >
                               Edit
@@ -3869,6 +4220,21 @@ export function GuidesPage() {
           guideShipOptions={guideShipOptions}
           onClose={handleCloseGuideEditor}
           onSave={handleGuideEditorSave}
+        />
+      ) : null}
+      {copyingSquad && activePlanet && activeMission ? (
+        <GuideCopyModal
+          squad={copyingSquad}
+          sourcePlanetName={activePlanet.name}
+          sourceMissionLabel={activeMission.label}
+          targetPlanetId={copyTargetPlanetId}
+          targetMissionId={copyTargetMissionId}
+          targetPlanets={copyTargetPlanets}
+          targetMissions={copyTargetMissions}
+          onPlanetChange={setCopyTargetPlanetId}
+          onMissionChange={setCopyTargetMissionId}
+          onClose={closeCopyGuideModal}
+          onConfirm={handleCopyGuide}
         />
       ) : null}
     </section>

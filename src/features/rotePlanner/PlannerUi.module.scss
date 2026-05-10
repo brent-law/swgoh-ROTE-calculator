@@ -1641,6 +1641,13 @@
   color: var(--planner-text-2);
 }
 
+.guideLimitNotice {
+  margin-top: 0.2rem;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: #ff8f87;
+}
+
 .actionRow,
 .searchRow,
 .inlineField,
@@ -1743,6 +1750,11 @@
   min-width: 0;
   color: rgba(242, 247, 255, 0.94);
   font-size: 0.76rem;
+}
+
+.guideMissionLabelAtLimit,
+.guidePlanetCountAtLimit {
+  color: #ff8f87;
 }
 
 .missionTypeBadge {
@@ -1891,6 +1903,21 @@
 
 .guideRosterStatusMissing {
   color: #ffb3ac;
+}
+
+.guideGuildReady,
+.guideGuildReadyMuted {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.guideGuildReady {
+  color: #7fb7ff;
+}
+
+.guideGuildReadyMuted {
+  color: var(--planner-text-2);
 }
 
 .guideCheckList {

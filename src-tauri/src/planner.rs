@@ -19,6 +19,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const OPT_GENES: usize = 18;
 const OPS_MEMBER_DAILY_CAP: i64 = 10;
 const OPS_SCARCE_CANDIDATE_THRESHOLD: usize = 3;
+const STAR_SCORE_SCALE: i64 = 10_000_000;
+const HOLD_MISSING_PENALTY: i64 = 1_000_000_000;
+const HOLD_SHORT_PENALTY: i64 = 500_000_000;
+const HOLD_PROGRESS_SCORE: i64 = 1_000_000;
+const HOLD_EXCESS_DAY_PENALTY: i64 = 100_000;
+const OVERFLOW_PRIMARY_MAX: i64 = 90_000;
+const OVERFLOW_SECONDARY_MAX: i64 = 9_999;
 
 #[derive(Debug, Clone)]
 struct OpsCandidate {
@@ -137,6 +144,13 @@ struct PlanetPriority {
 struct OptimizationBest {
     genome: Vec<i64>,
     score: i64,
+    stars: i64,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct GenomeEvaluation {
+    score: i64,
+    stars: i64,
 }
 
 #[derive(Debug)]
@@ -254,6 +268,8 @@ struct SimulatedPlan {
     active_bonus_count: i64,
     hold_started: bool,
     hold_days_kept_open: i64,
+    best_extra_star_gap: Option<i64>,
+    total_extra_star_gap: i64,
 }
 
 pub fn planner_reference() -> PlannerReferenceResponse {
@@ -598,9 +614,9 @@ fn run_algorithms_serial(
             });
         };
 
-        report_algorithm_progress(0.0, best_result.as_ref().map(|result| result.score).unwrap_or(0));
+        report_algorithm_progress(0.0, best_result.as_ref().map(|result| result.stars).unwrap_or(0));
         let result = engine.run_algorithm(key, &mut report_algorithm_progress);
-        scores.push(score_entry(key, result.score));
+        scores.push(score_entry(key, result.stars));
         if best_result
             .as_ref()
             .map(|current| result.score > current.score)
@@ -716,7 +732,7 @@ fn run_all_algorithms_parallel(
                 let global_best = progress_state
                     .values()
                     .map(|(_, score)| *score)
-                    .chain(best_result.iter().map(|result| result.score))
+                    .chain(best_result.iter().map(|result| result.stars))
                     .max()
                     .unwrap_or(0);
                 on_progress(PlannerOptimizationProgressEvent {
@@ -734,8 +750,8 @@ fn run_all_algorithms_parallel(
                 });
             }
             AlgorithmRunMessage::Complete { algorithm, result } => {
-                progress_state.insert(algorithm.clone(), (1.0, result.score));
-                completed_scores.insert(algorithm.clone(), result.score);
+                progress_state.insert(algorithm.clone(), (1.0, result.stars));
+                completed_scores.insert(algorithm.clone(), result.stars);
                 if best_result
                     .as_ref()
                     .map(|current| result.score > current.score)
@@ -805,7 +821,7 @@ pub fn benchmark_eval_batch(
     let mut total = 0i64;
     for _ in 0..samples {
         let genome = random_genome(&mut rng);
-        total += engine.eval_genome(&genome);
+        total += engine.eval_genome(&genome).score;
     }
     total
 }
@@ -867,7 +883,7 @@ impl PlannerEngine {
         }
     }
 
-    fn score_genomes_parallel(&self, genomes: &[Vec<i64>]) -> Vec<i64> {
+    fn score_genomes_parallel(&self, genomes: &[Vec<i64>]) -> Vec<GenomeEvaluation> {
         genomes
             .par_iter()
             .map(|genome| self.eval_genome(genome))
@@ -933,9 +949,13 @@ impl PlannerEngine {
     fn run_greedy(&self, on_progress: &mut dyn FnMut(f64, i64)) -> OptimizationBest {
         on_progress(0.5, 0);
         let genome = self.greedy_genome();
-        let score = self.eval_genome(&genome);
-        on_progress(1.0, score);
-        OptimizationBest { genome, score }
+        let evaluation = self.eval_genome(&genome);
+        on_progress(1.0, evaluation.stars);
+        OptimizationBest {
+            genome,
+            score: evaluation.score,
+            stars: evaluation.stars,
+        }
     }
 
     fn run_ga(&self, on_progress: &mut dyn FnMut(f64, i64)) -> OptimizationBest {
@@ -956,26 +976,28 @@ impl PlannerEngine {
         let mut best = OptimizationBest {
             genome: greedy,
             score: i64::MIN,
+            stars: 0,
         };
-        for (idx, score) in scores.iter().enumerate() {
-            if *score > best.score {
+        for (idx, evaluation) in scores.iter().enumerate() {
+            if evaluation.score > best.score {
                 best = OptimizationBest {
                     genome: population[idx].clone(),
-                    score: *score,
+                    score: evaluation.score,
+                    stars: evaluation.stars,
                 };
             }
         }
 
         for generation in 0..generations {
             if generation % 12 == 0 {
-                on_progress(generation as f64 / generations as f64, best.score);
+                on_progress(generation as f64 / generations as f64, best.stars);
             }
             let mut ranked = population
                 .iter()
                 .cloned()
                 .zip(scores.iter().copied())
                 .collect::<Vec<_>>();
-            ranked.sort_by(|left, right| right.1.cmp(&left.1));
+            ranked.sort_by(|left, right| right.1.score.cmp(&left.1.score));
 
             let mut next_population = ranked
                 .iter()
@@ -1008,17 +1030,18 @@ impl PlannerEngine {
 
             population = next_population;
             scores = self.score_genomes_parallel(&population);
-            for (idx, score) in scores.iter().enumerate() {
-                if *score > best.score {
+            for (idx, evaluation) in scores.iter().enumerate() {
+                if evaluation.score > best.score {
                     best = OptimizationBest {
                         genome: population[idx].clone(),
-                        score: *score,
+                        score: evaluation.score,
+                        stars: evaluation.stars,
                     };
                 }
             }
         }
 
-        on_progress(1.0, best.score);
+        on_progress(1.0, best.stars);
         best
     }
 
@@ -1030,16 +1053,17 @@ impl PlannerEngine {
         let mut rng = SimpleRng::seeded();
 
         let mut current = self.greedy_genome();
-        let mut current_score = self.eval_genome(&current);
+        let mut current_eval = self.eval_genome(&current);
         let mut best = OptimizationBest {
             genome: current.clone(),
-            score: current_score,
+            score: current_eval.score,
+            stars: current_eval.stars,
         };
         let mut temperature = t0;
 
         for iteration in 0..iterations {
             if iteration % 400 == 0 {
-                on_progress(iteration as f64 / iterations as f64, best.score);
+                on_progress(iteration as f64 / iterations as f64, best.stars);
             }
             let mut neighbor = current.clone();
             let mutation_count = if temperature > t0 * 0.5 {
@@ -1052,22 +1076,23 @@ impl PlannerEngine {
                 neighbor[idx] = rng.i64_inclusive(0, 3);
             }
 
-            let neighbor_score = self.eval_genome(&neighbor);
-            let delta = neighbor_score - current_score;
+            let neighbor_eval = self.eval_genome(&neighbor);
+            let delta = neighbor_eval.score - current_eval.score;
             if delta > 0 || rng.next_f64() < ((delta as f64) / temperature).exp() {
                 current = neighbor;
-                current_score = neighbor_score;
+                current_eval = neighbor_eval;
             }
-            if current_score > best.score {
+            if current_eval.score > best.score {
                 best = OptimizationBest {
                     genome: current.clone(),
-                    score: current_score,
+                    score: current_eval.score,
+                    stars: current_eval.stars,
                 };
             }
             temperature *= cooling;
         }
 
-        on_progress(1.0, best.score);
+        on_progress(1.0, best.stars);
         best
     }
 
@@ -1099,25 +1124,25 @@ impl PlannerEngine {
             .collect::<Vec<_>>();
 
         let mut global_best = base.iter().map(|gene| *gene as f64).collect::<Vec<_>>();
-        let mut global_score = self.eval_genome(&base);
+        let mut global_eval = self.eval_genome(&base);
 
         let initial_genomes = particles
             .iter()
             .map(|particle| particle.0.iter().copied().map(clamp_gene).collect::<Vec<_>>())
             .collect::<Vec<_>>();
         let initial_scores = self.score_genomes_parallel(&initial_genomes);
-        for (particle, score) in particles.iter_mut().zip(initial_scores.into_iter()) {
+        for (particle, evaluation) in particles.iter_mut().zip(initial_scores.into_iter()) {
             particle.2 = particle.0.clone();
-            particle.3 = score;
-            if score > global_score {
-                global_score = score;
+            particle.3 = evaluation.score;
+            if evaluation.score > global_eval.score {
+                global_eval = evaluation;
                 global_best = particle.0.clone();
             }
         }
 
         for iteration in 0..iterations {
             if iteration % 20 == 0 {
-                on_progress(iteration as f64 / iterations as f64, global_score);
+                on_progress(iteration as f64 / iterations as f64, global_eval.stars);
             }
             for particle in &mut particles {
                 for idx in 0..OPT_GENES {
@@ -1135,13 +1160,13 @@ impl PlannerEngine {
                 .map(|particle| particle.0.iter().copied().map(clamp_gene).collect::<Vec<_>>())
                 .collect::<Vec<_>>();
             let scores = self.score_genomes_parallel(&genomes);
-            for (particle, score) in particles.iter_mut().zip(scores.into_iter()) {
-                if score > particle.3 {
+            for (particle, evaluation) in particles.iter_mut().zip(scores.into_iter()) {
+                if evaluation.score > particle.3 {
                     particle.2 = particle.0.clone();
-                    particle.3 = score;
+                    particle.3 = evaluation.score;
                 }
-                if score > global_score {
-                    global_score = score;
+                if evaluation.score > global_eval.score {
+                    global_eval = evaluation;
                     global_best = particle.0.clone();
                 }
             }
@@ -1149,9 +1174,10 @@ impl PlannerEngine {
 
         let best = OptimizationBest {
             genome: global_best.into_iter().map(clamp_gene).collect(),
-            score: global_score,
+            score: global_eval.score,
+            stars: global_eval.stars,
         };
-        on_progress(1.0, best.score);
+        on_progress(1.0, best.stars);
         best
     }
 
@@ -1188,8 +1214,12 @@ impl PlannerEngine {
 
         let mut best = OptimizationBest {
             genome: base.clone(),
-            score: self.eval_genome(&base),
+            score: i64::MIN,
+            stars: 0,
         };
+        let base_eval = self.eval_genome(&base);
+        best.score = base_eval.score;
+        best.stars = base_eval.stars;
 
         for iteration in 0..iterations {
             for agent_idx in 0..agents.len() {
@@ -1197,17 +1227,18 @@ impl PlannerEngine {
                     on_progress(
                         (iteration as f64 + (agent_idx as f64 / agent_count as f64))
                             / iterations as f64,
-                        best.score,
+                        best.stars,
                     );
                 }
 
                 let agent = &mut agents[agent_idx];
                 let current = agent.0.iter().copied().map(clamp_gene).collect::<Vec<_>>();
-                let base_score = self.eval_genome(&current);
-                if base_score > best.score {
+                let base_eval = self.eval_genome(&current);
+                if base_eval.score > best.score {
                     best = OptimizationBest {
                         genome: current.clone(),
-                        score: base_score,
+                        score: base_eval.score,
+                        stars: base_eval.stars,
                     };
                 }
 
@@ -1228,24 +1259,26 @@ impl PlannerEngine {
                     .map(|(idx, value)| (*value - step * delta[idx]).clamp(0.0, 3.0))
                     .map(clamp_gene)
                     .collect::<Vec<_>>();
-                let plus_score = self.eval_genome(&plus);
-                let minus_score = self.eval_genome(&minus);
-                if plus_score > best.score {
+                let plus_eval = self.eval_genome(&plus);
+                let minus_eval = self.eval_genome(&minus);
+                if plus_eval.score > best.score {
                     best = OptimizationBest {
                         genome: plus.clone(),
-                        score: plus_score,
+                        score: plus_eval.score,
+                        stars: plus_eval.stars,
                     };
                 }
-                if minus_score > best.score {
+                if minus_eval.score > best.score {
                     best = OptimizationBest {
                         genome: minus.clone(),
-                        score: minus_score,
+                        score: minus_eval.score,
+                        stars: minus_eval.stars,
                     };
                 }
 
                 agent.3 += 1;
                 let t = agent.3 as f64;
-                let scale = (plus_score - minus_score) as f64 / (2.0 * step);
+                let scale = (plus_eval.score - minus_eval.score) as f64 / (2.0 * step);
                 for idx in 0..OPT_GENES {
                     let gradient = scale * delta[idx];
                     agent.1[idx] = b1 * agent.1[idx] + (1.0 - b1) * gradient;
@@ -1259,7 +1292,7 @@ impl PlannerEngine {
             }
         }
 
-        on_progress(1.0, best.score);
+        on_progress(1.0, best.stars);
         best
     }
 
@@ -1285,9 +1318,9 @@ impl PlannerEngine {
             let scores = self.score_genomes_parallel(&candidates);
             let mut best_combo = [1, 1, 1];
             let mut best_score = i64::MIN;
-            for (combo, score) in combos.into_iter().zip(scores.into_iter()) {
-                if score > best_score {
-                    best_score = score;
+            for (combo, evaluation) in combos.into_iter().zip(scores.into_iter()) {
+                if evaluation.score > best_score {
+                    best_score = evaluation.score;
                     best_combo = combo;
                 }
             }
@@ -1299,17 +1332,33 @@ impl PlannerEngine {
         genome
     }
 
-    fn eval_genome(&self, genome: &[i64]) -> i64 {
+    fn eval_genome(&self, genome: &[i64]) -> GenomeEvaluation {
         let simulated = self.simulate_genome_plan(genome, false);
+        GenomeEvaluation {
+            score: self.score_simulated_plan(&simulated),
+            stars: simulated.total_stars,
+        }
+    }
+
+    fn score_simulated_plan(&self, simulated: &SimulatedPlan) -> i64 {
+        let mut score = simulated.total_stars * STAR_SCORE_SCALE;
+
         if let Some(hold) = &self.hold_constraint {
             if !simulated.hold_started {
-                return -100_000;
-            }
-            if simulated.hold_days_kept_open < hold.days {
-                return -50_000 + simulated.total_stars;
+                score -= HOLD_MISSING_PENALTY;
+            } else if simulated.hold_days_kept_open < hold.days {
+                score -= HOLD_SHORT_PENALTY;
+                score += simulated.hold_days_kept_open * HOLD_PROGRESS_SCORE;
+            } else {
+                let excess_days = (simulated.hold_days_kept_open - hold.days).max(0);
+                score -= excess_days * HOLD_EXCESS_DAY_PENALTY;
             }
         }
-        simulated.total_stars
+
+        score + overflow_opportunity_bonus(
+            simulated.best_extra_star_gap,
+            simulated.total_extra_star_gap,
+        )
     }
 
     fn simulate_genome_plan(&self, genome: &[i64], detailed: bool) -> SimulatedPlan {
@@ -1326,6 +1375,8 @@ impl PlannerEngine {
         };
         let mut total_stars = 0i64;
         let mut hold_tracker = HoldTracker::default();
+        let mut best_extra_star_gap = None::<i64>;
+        let mut total_extra_star_gap = 0i64;
 
         for day_idx in 0..6usize {
             let day = day_idx as i64 + 1;
@@ -1515,11 +1566,7 @@ impl PlannerEngine {
                     } else {
                         base.min(planet.stars[0] - 1)
                     };
-                    let safe_banked = if day == 6 && !hold_requires_open_today {
-                        final_day_preload_carry(raw_safe_banked, planet.stars[0])
-                    } else {
-                        raw_safe_banked
-                    };
+                    let safe_banked = raw_safe_banked;
                     if let Some(progress) = state.get_mut(chain_key) {
                         progress.banked = safe_banked;
                     }
@@ -1550,6 +1597,15 @@ impl PlannerEngine {
                             },
                         );
                     }
+                    if day == 6 {
+                        record_next_star_gap(
+                            &mut best_extra_star_gap,
+                            &mut total_extra_star_gap,
+                            planet,
+                            0,
+                            safe_banked,
+                        );
+                    }
                     continue;
                 }
 
@@ -1560,6 +1616,15 @@ impl PlannerEngine {
                 };
                 let pts = base + gp_alloc;
                 let stars = stars_at(planet, pts);
+                if day == 6 {
+                    record_next_star_gap(
+                        &mut best_extra_star_gap,
+                        &mut total_extra_star_gap,
+                        planet,
+                        stars,
+                        pts,
+                    );
+                }
                 if is_hold_planet && day == 6 {
                     if let Some(hold) = &self.hold_constraint {
                         if hold_tracker.days_kept_open + 1 >= hold.days {
@@ -1657,13 +1722,17 @@ impl PlannerEngine {
                 } else if stars >= 1 {
                     0
                 } else {
-                    let raw_carry = pts.min(planet.stars[0] - 1);
-                    if day == 6 {
-                        final_day_preload_carry(raw_carry, planet.stars[0])
-                    } else {
-                        raw_carry
-                    }
+                    pts.min(planet.stars[0] - 1)
                 };
+                if day == 6 {
+                    record_next_star_gap(
+                        &mut best_extra_star_gap,
+                        &mut total_extra_star_gap,
+                        &planet,
+                        stars,
+                        pts,
+                    );
+                }
                 if hold_requires_open_today {
                     hold_tracker.started = true;
                     hold_tracker.days_kept_open += 1;
@@ -1728,6 +1797,8 @@ impl PlannerEngine {
                 active_bonus_count: 0,
                 hold_started: hold_tracker.started,
                 hold_days_kept_open: hold_tracker.days_kept_open,
+                best_extra_star_gap,
+                total_extra_star_gap,
             };
         }
 
@@ -1751,6 +1822,8 @@ impl PlannerEngine {
             active_bonus_count,
             hold_started: hold_tracker.started,
             hold_days_kept_open: hold_tracker.days_kept_open,
+            best_extra_star_gap,
+            total_extra_star_gap,
         }
     }
 
@@ -2663,16 +2736,45 @@ fn score_entry(algorithm: &str, score: i64) -> PlannerAlgorithmScore {
     }
 }
 
-fn final_day_preload_carry(banked: i64, threshold_1: i64) -> i64 {
-    if banked <= 0 || threshold_1 <= 0 {
+fn record_next_star_gap(
+    best_gap: &mut Option<i64>,
+    total_gap: &mut i64,
+    planet: &PlannerPlanetDefinition,
+    stars: i64,
+    pts: i64,
+) {
+    let Some(gap) = next_star_gap(planet, stars, pts) else {
+        return;
+    };
+    *best_gap = Some(best_gap.map(|current| current.min(gap)).unwrap_or(gap));
+    *total_gap += gap;
+}
+
+fn next_star_gap(planet: &PlannerPlanetDefinition, stars: i64, pts: i64) -> Option<i64> {
+    if stars < 0 {
+        return None;
+    }
+    let next_star_idx = stars as usize;
+    let threshold = planet.stars.get(next_star_idx).copied()?;
+    if threshold <= 0 {
+        return None;
+    }
+    Some((threshold - pts).max(0))
+}
+
+fn overflow_opportunity_bonus(best_gap: Option<i64>, total_gap: i64) -> i64 {
+    let Some(best_gap) = best_gap else {
         return 0;
-    }
-    let ratio = banked as f64 / threshold_1 as f64;
-    if ratio >= 0.9 {
-        banked
-    } else {
-        0
-    }
+    };
+
+    let best_component =
+        (OVERFLOW_PRIMARY_MAX - (best_gap / 100_000).min(OVERFLOW_PRIMARY_MAX)).max(0);
+    let secondary_gap = total_gap.saturating_sub(best_gap);
+    let secondary_component = (OVERFLOW_SECONDARY_MAX
+        - (secondary_gap / 1_000_000).min(OVERFLOW_SECONDARY_MAX))
+    .max(0);
+
+    best_component + secondary_component
 }
 
 fn optimization_progress_message(algorithm: &str, fraction: f64, best_score: i64) -> String {
@@ -3178,11 +3280,15 @@ fn random_genome(rng: &mut SimpleRng) -> Vec<i64> {
     (0..OPT_GENES).map(|_| rng.i64_inclusive(0, 3)).collect()
 }
 
-fn tournament_pick(population: &[Vec<i64>], scores: &[i64], rng: &mut SimpleRng) -> Vec<i64> {
+fn tournament_pick(
+    population: &[Vec<i64>],
+    scores: &[GenomeEvaluation],
+    rng: &mut SimpleRng,
+) -> Vec<i64> {
     let mut best_idx = rng.usize_below(population.len());
     for _ in 1..6 {
         let idx = rng.usize_below(population.len());
-        if scores[idx] > scores[best_idx] {
+        if scores[idx].score > scores[best_idx].score {
             best_idx = idx;
         }
     }

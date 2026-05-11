@@ -147,6 +147,30 @@ export type PlannerSettings = {
   planetHold: PlannerPlanetHoldConfig | null;
 };
 
+export type PersistedPlannerMissionOverrideState = {
+  rateOverride: number | null;
+  countOverride: number | null;
+};
+
+export type PersistedPlannerPlanetState = {
+  cmRateOverride: number | null;
+  fleetRateOverride: number | null;
+  cmCountOverride: number | null;
+  fleetCountOverride: number | null;
+  missionOverrides: Record<string, PersistedPlannerMissionOverrideState>;
+};
+
+export type PersistedPlannerSettings = {
+  cmMode: string;
+  undepMode: string;
+  cmBase: number;
+  cmFalloff: number;
+  fleetBase: number;
+  fleetFalloff: number;
+  dailyUndep: number[];
+  planetState: Record<string, PersistedPlannerPlanetState>;
+};
+
 export type PlannerMissionDefinition = {
   id: string;
   label: string;
@@ -463,6 +487,12 @@ export type OpenExportPreviewResponse = {
   windowLabel: string;
 };
 
+export type PersistedAppState = {
+  primaryAllyCode?: string;
+  plannerSettings?: PersistedPlannerSettings;
+  guideData?: GuideDataSnapshot;
+};
+
 export type PersistedPlannerState = {
   primaryAllyCode?: string;
   plannerSettings?: PlannerSettings;
@@ -581,9 +611,9 @@ export const plannerApi = {
     );
   },
   loadAppState() {
-    return invokeCommand<{ state: PersistedPlannerState }>("load_app_state");
+    return invokeCommand<{ state: PersistedAppState }>("load_app_state");
   },
-  saveAppState(snapshot: PersistedPlannerState) {
+  saveAppState(snapshot: PersistedAppState) {
     return invokeCommand<{ saved: boolean }>("save_app_state", {
       request: { snapshot },
     });

@@ -11,11 +11,13 @@ import {
   type GuildRosters,
   type GuildSummary,
   type OpsDefinitions,
-  type PersistedPlannerState,
+  type PersistedAppState,
+  type PersistedPlannerMissionOverrideState,
+  type PersistedPlannerPlanetState,
+  type PersistedPlannerSettings,
   type PlannerAlgorithmScore,
   type PlannerOptimizationProgressEvent,
   type PlannerMissionOverrideState,
-  type PlannerPlanetHoldConfig,
   type PlannerOptimizationResponse,
   type PlannerPlanetState,
   type PlannerProjectionResponse,
@@ -194,16 +196,16 @@ export type PlannerStore = {
 
 function defaultPlannerSettings(): PlannerSettings {
   return {
-    guildGp: 452_750_000,
-    guildMembers: 50,
-    activeMembers: 50,
+    guildGp: 0,
+    guildMembers: 0,
+    activeMembers: 0,
     cmMode: "pct",
     undepMode: "pct",
-    cmBase: 70,
-    cmFalloff: 10,
-    fleetBase: 50,
-    fleetFalloff: 15,
-    dailyUndep: [3, 5, 6, 8, 10, 12],
+    cmBase: 0,
+    cmFalloff: 0,
+    fleetBase: 0,
+    fleetFalloff: 0,
+    dailyUndep: [0, 0, 0, 0, 0, 0],
     planetState: {},
     planetHold: null,
   };
@@ -599,7 +601,7 @@ function normalizePlanetPlannerStateMap(
 
 function createInitialState() {
   return {
-    guildName: "Crimson Order",
+    guildName: "",
     activePhase: 1,
     sessionStatus: "idle" as SessionStatus,
     lastSyncAt: null,
@@ -716,27 +718,9 @@ function normalizePlannerSettings(
           : defaults.dailyUndep[index];
       })
     : defaults.dailyUndep;
-  const planetHold =
-    record.planetHold &&
-    typeof record.planetHold === "object" &&
-    typeof (record.planetHold as PlannerPlanetHoldConfig).planetId === "string"
-      ? {
-          planetId: String((record.planetHold as PlannerPlanetHoldConfig).planetId).trim(),
-          days: clampNumber(
-            Math.round(Number((record.planetHold as PlannerPlanetHoldConfig).days) || 1),
-            1,
-            6,
-          ),
-        }
-      : null;
-
   return {
-    guildGp:
-      typeof record.guildGp === "number"
-        ? record.guildGp
-        : guildSummary?.gp ?? defaults.guildGp,
-    guildMembers:
-      typeof record.guildMembers === "number" ? record.guildMembers : guildMembers,
+    guildGp: guildSummary?.gp ?? defaults.guildGp,
+    guildMembers,
     activeMembers: guildMembers,
     cmMode: record.cmMode === "count" ? "count" : "pct",
     undepMode: record.undepMode === "flat" ? "flat" : "pct",
@@ -751,7 +735,7 @@ function normalizePlannerSettings(
         : defaults.fleetFalloff,
     dailyUndep,
     planetState: normalizePlanetPlannerStateMap(record.planetState),
-    planetHold: planetHold?.planetId ? planetHold : null,
+    planetHold: null,
   };
 }
 
@@ -828,24 +812,57 @@ function formatOptimizationCompletionStatus(plannerResult: PlannerOptimizationRe
   return summary ? `${baseMessage} | ${summary}` : baseMessage;
 }
 
-function toPersistedAppState(state: PlannerStore): PersistedPlannerState {
+function toPersistedMissionOverrideState(
+  missionState: PlannerMissionOverrideState,
+): PersistedPlannerMissionOverrideState {
+  return {
+    rateOverride: missionState.rateOverride,
+    countOverride: missionState.countOverride,
+  };
+}
+
+function toPersistedPlanetPlannerState(
+  planetState: PlannerPlanetState,
+): PersistedPlannerPlanetState {
+  return {
+    cmRateOverride: planetState.cmRateOverride,
+    fleetRateOverride: planetState.fleetRateOverride,
+    cmCountOverride: planetState.cmCountOverride,
+    fleetCountOverride: planetState.fleetCountOverride,
+    missionOverrides: Object.fromEntries(
+      Object.entries(planetState.missionOverrides).map(([missionId, missionState]) => [
+        missionId,
+        toPersistedMissionOverrideState(missionState),
+      ]),
+    ),
+  };
+}
+
+function toPersistedPlannerSettings(
+  plannerSettings: PlannerSettings,
+): PersistedPlannerSettings {
+  return {
+    cmMode: plannerSettings.cmMode,
+    undepMode: plannerSettings.undepMode,
+    cmBase: plannerSettings.cmBase,
+    cmFalloff: plannerSettings.cmFalloff,
+    fleetBase: plannerSettings.fleetBase,
+    fleetFalloff: plannerSettings.fleetFalloff,
+    dailyUndep: plannerSettings.dailyUndep.slice(0, 6),
+    planetState: Object.fromEntries(
+      Object.entries(plannerSettings.planetState).map(([planetId, planetState]) => [
+        planetId,
+        toPersistedPlanetPlannerState(planetState),
+      ]),
+    ),
+  };
+}
+
+function toPersistedAppState(state: PlannerStore): PersistedAppState {
   return {
     primaryAllyCode: state.primaryAllyCode,
-    plannerSettings: state.plannerSettings,
-    selectedAlgorithm: state.selectedAlgorithm,
-    optimizerAcknowledged: state.optimizerAcknowledged,
-    selectedChain: state.selectedChain,
-    selectedOperationsDay: state.selectedOperationsDay,
-    selectedOperationsPlanetId: state.selectedOperationsPlanetId,
-    selectedGuideMember: state.selectedGuideMember,
-    selectedGuideMission: state.selectedGuideMission,
-    expandedGuidePlanets: state.expandedGuidePlanets,
+    plannerSettings: toPersistedPlannerSettings(state.plannerSettings),
     guideData: state.guideData,
-    guideEditorDifficulty: state.guideEditorDifficulty,
-    selectedRosterMemberId: state.selectedRosterMemberId,
-    rosterSearch: state.rosterSearch,
-    rosterFilter: state.rosterFilter,
-    rosterSortKey: state.rosterSortKey,
   };
 }
 
@@ -961,22 +978,9 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
           persisted.plannerSettings,
           guildSummary,
         );
-        const persistedGuideMission = isPersistedGuideMission(
-          persisted.selectedGuideMission,
-        )
-          ? persisted.selectedGuideMission
-          : undefined;
 
         set((state) => {
           const firstScannedMember = firstRosterMember(guildRosters);
-          const persistedGuideMember =
-            typeof persisted.selectedGuideMember === "string"
-              ? persisted.selectedGuideMember
-              : "";
-          const persistedRosterMember =
-            typeof persisted.selectedRosterMemberId === "string"
-              ? persisted.selectedRosterMemberId
-              : "";
 
           return {
             isHydrated: true,
@@ -991,59 +995,12 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
               typeof persisted.primaryAllyCode === "string"
                 ? persisted.primaryAllyCode
                 : state.primaryAllyCode,
-            selectedAlgorithm:
-              typeof persisted.selectedAlgorithm === "string"
-                ? persisted.selectedAlgorithm
-                : state.selectedAlgorithm,
-            optimizerAcknowledged:
-              typeof persisted.optimizerAcknowledged === "boolean"
-                ? persisted.optimizerAcknowledged
-                : state.optimizerAcknowledged,
-            selectedChain:
-              persisted.selectedChain === "ds" ||
-              persisted.selectedChain === "mx" ||
-              persisted.selectedChain === "ls"
-                ? persisted.selectedChain
-                : state.selectedChain,
-            selectedOperationsDay:
-              typeof persisted.selectedOperationsDay === "number"
-                ? persisted.selectedOperationsDay
-                : state.selectedOperationsDay,
-            selectedOperationsPlanetId:
-              typeof persisted.selectedOperationsPlanetId === "string"
-                ? persisted.selectedOperationsPlanetId
-                : state.selectedOperationsPlanetId,
-            selectedGuideMember: hasRosterSelection(persistedGuideMember, guildRosters)
-              ? persistedGuideMember
-              : firstScannedMember,
-            selectedGuideMission: persistedGuideMission ?? state.selectedGuideMission,
-            expandedGuidePlanets: Array.isArray(persisted.expandedGuidePlanets)
-              ? persisted.expandedGuidePlanets.filter(
-                  (entry): entry is string => typeof entry === "string",
-                )
-              : state.expandedGuidePlanets,
+            selectedGuideMember: firstScannedMember,
+            selectedGuideMission: state.selectedGuideMission,
+            expandedGuidePlanets: state.expandedGuidePlanets,
             guideData: normalizeGuideData(persisted.guideData),
-            guideEditorDifficulty:
-              persisted.guideEditorDifficulty === "easy" ||
-              persisted.guideEditorDifficulty === "medium" ||
-              persisted.guideEditorDifficulty === "hard"
-                ? persisted.guideEditorDifficulty
-                : "auto",
-            selectedRosterMemberId: hasRosterSelection(persistedRosterMember, guildRosters)
-              ? persistedRosterMember
-              : firstScannedMember,
-            rosterSearch:
-              typeof persisted.rosterSearch === "string"
-                ? persisted.rosterSearch
-                : state.rosterSearch,
-            rosterFilter:
-              typeof persisted.rosterFilter === "string"
-                ? persisted.rosterFilter
-                : state.rosterFilter,
-            rosterSortKey:
-              typeof persisted.rosterSortKey === "string"
-                ? persisted.rosterSortKey
-                : state.rosterSortKey,
+            guideEditorDifficulty: "auto",
+            selectedRosterMemberId: firstScannedMember,
             statusMessage:
               bootstrap.comlinkStatus.comlink === "online"
                 ? "Planner ready."

@@ -1761,7 +1761,7 @@ export function GuildOverviewPage() {
   const fetchGuildByAllyCode = usePlannerStore((state) => state.fetchGuildByAllyCode);
   const scanGuildRosters = usePlannerStore((state) => state.scanGuildRosters);
 
-  const [draftAllyCode, setDraftAllyCode] = useState(primaryAllyCode || "658-388-776");
+  const [draftAllyCode, setDraftAllyCode] = useState(primaryAllyCode || "");
   const [applyStatus, setApplyStatus] = useState("");
   const displayedMembers = buildOverviewMembers(guildSummary, guildRosters);
   const summary = plannerProjection?.summary;

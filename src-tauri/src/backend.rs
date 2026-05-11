@@ -105,16 +105,6 @@ const APP_STATE_FILE: &str = "app_state.json";
 const STATCALC_BRIDGE_FILE: &str = "statcalc_bridge.py";
 const STATCALC_REQUEST_FILE: &str = "statcalc_request.json";
 const STATCALC_GAMEDATA_CACHE_FILE: &str = "statcalc_game_data.json";
-const VOLATILE_APP_STATE_KEYS: &[&str] = &[
-    "guildSummary",
-    "guildRosters",
-    "lastPlanResult",
-    "lastPlanStars",
-    "platoonAnalysis",
-    "selectedGuideMember",
-    "selectedRosterMember",
-];
-
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SkillMeta {
@@ -1222,7 +1212,7 @@ fn try_apply_statcalc_power(app_handle: &AppHandle, players: &mut [Value]) -> (b
     for (player, result) in players.iter_mut().zip(response.results.into_iter()) {
         if let Some(roster) = player.get_mut("rosterUnit").and_then(Value::as_array_mut) {
             for (unit, power) in roster.iter_mut().zip(result.powers.into_iter()) {
-                if power <= 0 || extract_unit_power(unit) > 0 {
+                if power <= 0 {
                     continue;
                 }
                 if let Some(record) = unit.as_object_mut() {
@@ -1303,7 +1293,11 @@ fn player_needs_power_calc(player: &Value) -> bool {
     player
         .get("rosterUnit")
         .and_then(Value::as_array)
-        .map(|roster| roster.iter().any(|unit| extract_unit_power(unit) <= 0))
+        .map(|roster| {
+            roster
+                .iter()
+                .any(|unit| extract_authoritative_unit_power(unit) <= 0)
+        })
         .unwrap_or(false)
 }
 
@@ -1312,7 +1306,10 @@ fn player_has_complete_power(player: &Value) -> bool {
         .get("rosterUnit")
         .and_then(Value::as_array)
         .map(|roster| {
-            roster.is_empty() || roster.iter().all(|unit| extract_unit_power(unit) > 0)
+            roster.is_empty()
+                || roster
+                    .iter()
+                    .all(|unit| extract_authoritative_unit_power(unit) > 0)
         })
         .unwrap_or(true)
 }
@@ -2091,18 +2088,153 @@ fn save_app_state_to_disk(app_handle: &AppHandle, snapshot: Value) -> CommandRes
     fs::write(&path, payload).map_err(|error| CommandError::new("app_state_write", error.to_string()))
 }
 
+fn clone_number_or_null(value: Option<&Value>) -> Option<Value> {
+    match value {
+        Some(Value::Number(number)) => Some(Value::Number(number.clone())),
+        Some(Value::Null) => Some(Value::Null),
+        _ => None,
+    }
+}
+
+fn sanitize_persisted_mission_override(value: &Value) -> Option<Value> {
+    let object = value.as_object()?;
+    let mut sanitized = Map::new();
+
+    if let Some(rate_override) = clone_number_or_null(object.get("rateOverride")) {
+        sanitized.insert(String::from("rateOverride"), rate_override);
+    }
+    if let Some(count_override) = clone_number_or_null(object.get("countOverride")) {
+        sanitized.insert(String::from("countOverride"), count_override);
+    }
+
+    Some(Value::Object(sanitized))
+}
+
+fn sanitize_persisted_planet_state(value: &Value) -> Option<Value> {
+    let object = value.as_object()?;
+    let mut sanitized = Map::new();
+
+    for key in [
+        "cmRateOverride",
+        "fleetRateOverride",
+        "cmCountOverride",
+        "fleetCountOverride",
+    ] {
+        if let Some(number) = clone_number_or_null(object.get(key)) {
+            sanitized.insert(String::from(key), number);
+        }
+    }
+
+    let mission_overrides = object
+        .get("missionOverrides")
+        .and_then(Value::as_object)
+        .map(|missions| {
+            let mission_map = missions
+                .iter()
+                .filter_map(|(mission_id, mission_state)| {
+                    sanitize_persisted_mission_override(mission_state)
+                        .map(|sanitized_state| (mission_id.clone(), sanitized_state))
+                })
+                .collect::<Map<String, Value>>();
+            Value::Object(mission_map)
+        })
+        .unwrap_or_else(|| Value::Object(Map::new()));
+    sanitized.insert(String::from("missionOverrides"), mission_overrides);
+
+    Some(Value::Object(sanitized))
+}
+
+fn sanitize_persisted_planner_settings(value: &Value) -> Option<Value> {
+    let object = value.as_object()?;
+    let mut sanitized = Map::new();
+
+    for (key, allowed_values) in [("cmMode", ["pct", "count"]), ("undepMode", ["pct", "flat"])] {
+        if let Some(mode) = object.get(key).and_then(Value::as_str) {
+            if allowed_values.contains(&mode) {
+                sanitized.insert(String::from(key), Value::String(mode.to_string()));
+            }
+        }
+    }
+
+    for key in ["cmBase", "cmFalloff", "fleetBase", "fleetFalloff"] {
+        if let Some(number) = clone_number_or_null(object.get(key)) {
+            sanitized.insert(String::from(key), number);
+        }
+    }
+
+    if let Some(values) = object.get("dailyUndep").and_then(Value::as_array) {
+        let sanitized_values = values
+            .iter()
+            .filter_map(|value| match value {
+                Value::Number(number) => Some(Value::Number(number.clone())),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        sanitized.insert(String::from("dailyUndep"), Value::Array(sanitized_values));
+    }
+
+    let planet_state = object
+        .get("planetState")
+        .and_then(Value::as_object)
+        .map(|planets| {
+            let planet_map = planets
+                .iter()
+                .filter_map(|(planet_id, state)| {
+                    sanitize_persisted_planet_state(state)
+                        .map(|sanitized_state| (planet_id.clone(), sanitized_state))
+                })
+                .collect::<Map<String, Value>>();
+            Value::Object(planet_map)
+        })
+        .unwrap_or_else(|| Value::Object(Map::new()));
+    sanitized.insert(String::from("planetState"), planet_state);
+
+    Some(Value::Object(sanitized))
+}
+
 fn sanitize_persisted_app_state(snapshot: Value) -> Value {
-    let Some(mut object) = snapshot.as_object().cloned() else {
+    let Some(object) = snapshot.as_object() else {
         return json!({});
     };
-    for key in VOLATILE_APP_STATE_KEYS {
-        object.remove(*key);
+
+    let mut sanitized = Map::new();
+
+    if let Some(primary_ally_code) = object.get("primaryAllyCode").and_then(Value::as_str) {
+        sanitized.insert(
+            String::from("primaryAllyCode"),
+            Value::String(primary_ally_code.to_string()),
+        );
     }
-    Value::Object(object)
+
+    if let Some(planner_settings) = object
+        .get("plannerSettings")
+        .and_then(sanitize_persisted_planner_settings)
+    {
+        sanitized.insert(String::from("plannerSettings"), planner_settings);
+    }
+
+    if let Some(guide_data) = object.get("guideData").and_then(Value::as_object) {
+        sanitized.insert(String::from("guideData"), Value::Object(guide_data.clone()));
+    }
+
+    Value::Object(sanitized)
 }
 
 fn app_state_path(app_handle: &AppHandle) -> CommandResult<PathBuf> {
-    Ok(comlink_dir(app_handle)?.join(APP_STATE_FILE))
+    Ok(app_state_dir(app_handle)?.join(APP_STATE_FILE))
+}
+
+fn app_state_dir(app_handle: &AppHandle) -> CommandResult<PathBuf> {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            return Ok(parent.to_path_buf());
+        }
+    }
+
+    app_handle
+        .path()
+        .app_local_data_dir()
+        .map_err(|error| CommandError::new("path", error.to_string()))
 }
 
 fn sanitize_export_path_segment(value: &str) -> String {
@@ -3493,7 +3625,7 @@ fn extract_speed(unit: &Value) -> i64 {
     0
 }
 
-fn extract_unit_power(unit: &Value) -> i64 {
+fn extract_authoritative_unit_power(unit: &Value) -> i64 {
     extract_i64_from_paths(
         unit,
         &[
@@ -3501,7 +3633,6 @@ fn extract_unit_power(unit: &Value) -> i64 {
             &["power"],
             &["galacticPower"],
             &["unitPower"],
-            &["currentPower"],
             &["stats", "gp"],
             &["stats", "power"],
             &["summary", "gp"],
@@ -3509,6 +3640,12 @@ fn extract_unit_power(unit: &Value) -> i64 {
         ],
     )
     .unwrap_or(0)
+}
+
+fn extract_unit_power(unit: &Value) -> i64 {
+    extract_authoritative_unit_power(unit).max(
+        extract_i64_from_paths(unit, &[&["currentPower"]]).unwrap_or(0),
+    )
 }
 
 fn normalize_ally_code_input(value: &str) -> String {

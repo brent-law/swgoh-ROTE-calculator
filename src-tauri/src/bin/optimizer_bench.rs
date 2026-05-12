@@ -1,10 +1,6 @@
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use base64::Engine;
-use flate2::read::ZlibDecoder;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
-use std::io::Read;
 use std::time::Instant;
 use swgoh_toolkit_lib::models::{
     GuildRosters, OpsDefinitions, PlannerSettings, PlatoonRequirement, SimplifiedRosterUnit,
@@ -17,8 +13,8 @@ const STATCALC_REQUEST_PATH: &str =
     "C:\\Users\\brent\\AppData\\Local\\com.swgoh-toolkit.app\\.comlink\\statcalc_request.json";
 const UNIT_NAMES_PATH: &str =
     "C:\\Users\\brent\\AppData\\Local\\com.swgoh-toolkit.app\\.comlink\\unit_names.json";
-const LEGACY_OPS_FALLBACK_PATH: &str =
-    "F:\\swgoh-ROTE-calculator\\old code base\\rote_ops_fallback.py";
+const BUNDLED_OPS_FALLBACK_PATH: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/bundled/ops_fallback_embedded.json");
 
 fn main() {
     if let Err(error) = run() {
@@ -43,7 +39,7 @@ fn run() -> Result<(), String> {
     let settings = load_planner_settings(APP_STATE_PATH)?;
     let unit_names = load_unit_names(UNIT_NAMES_PATH)?;
     let rosters = load_rosters(STATCALC_REQUEST_PATH, &unit_names)?;
-    let ops_defs = load_ops_definitions(LEGACY_OPS_FALLBACK_PATH, &unit_names)?;
+    let ops_defs = load_ops_definitions(BUNDLED_OPS_FALLBACK_PATH, &unit_names)?;
 
     println!(
         "Loaded benchmark data: {} roster profiles, {} operation planets, algorithm={}, repeats={}",
@@ -219,29 +215,8 @@ fn load_ops_definitions(
     path: &str,
     unit_names: &HashMap<String, String>,
 ) -> Result<OpsDefinitions, String> {
-    let source = fs::read_to_string(path).map_err(|error| format!("Failed to read {path}: {error}"))?;
-    let marker = "_WIKI_OPS_DATA_B64 = \"\"\"";
-    let start = source
-        .find(marker)
-        .ok_or_else(|| String::from("Could not find the wiki ops data marker."))?
-        + marker.len();
-    let after_marker = &source[start..];
-    let after_prefix = after_marker
-        .strip_prefix("\\\r\n")
-        .or_else(|| after_marker.strip_prefix("\\\n"))
-        .unwrap_or(after_marker);
-    let end = after_prefix
-        .find("\"\"\"")
-        .ok_or_else(|| String::from("Could not find the end of the wiki ops data block."))?;
-    let encoded = after_prefix[..end].lines().collect::<String>();
-    let compressed = BASE64_STANDARD
-        .decode(encoded.as_bytes())
-        .map_err(|error| format!("Failed to decode bundled ops data: {error}"))?;
-    let mut decoder = ZlibDecoder::new(compressed.as_slice());
-    let mut json_text = String::new();
-    decoder
-        .read_to_string(&mut json_text)
-        .map_err(|error| format!("Failed to inflate bundled ops data: {error}"))?;
+    let json_text =
+        fs::read_to_string(path).map_err(|error| format!("Failed to read {path}: {error}"))?;
     let names = serde_json::from_str::<HashMap<String, Vec<Vec<String>>>>(&json_text)
         .map_err(|error| format!("Failed to parse bundled ops JSON: {error}"))?;
 

@@ -17,7 +17,7 @@ use crate::models::{
 use crate::planner;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use flate2::read::{GzDecoder, ZlibDecoder};
+use flate2::read::GzDecoder;
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -49,8 +49,8 @@ const COMLINK_RELEASE_API: &str =
     "https://api.github.com/repos/swgoh-utils/swgoh-comlink/releases/latest";
 const GUILD_SCAN_PROGRESS_EVENT: &str = "guild-scan-progress";
 const PLANNER_OPTIMIZATION_PROGRESS_EVENT: &str = "planner-optimization-progress";
-const LEGACY_OPS_FALLBACK: &str = include_str!("../../old code base/rote_ops_fallback.py");
-const LEGACY_PLANNER_SOURCE: &str = include_str!("../../old code base/rote_planner.py");
+const BUNDLED_OPS_FALLBACK_JSON: &str = include_str!("../bundled/ops_fallback_embedded.json");
+const BUNDLED_UNIT_REFERENCE_JSON: &str = include_str!("../bundled/unit_reference_legacy.json");
 const STATCALC_BRIDGE_SOURCE: &str = include_str!("../python/statcalc_bridge.py");
 static COMLINK_HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 static LEGACY_UNIT_DATA: OnceLock<LegacyUnitData> = OnceLock::new();
@@ -92,6 +92,20 @@ struct LegacyUnitData {
     ship_defid_keys: HashSet<String>,
     character_defid_keys: HashSet<String>,
     name_index: HashMap<String, Vec<String>>,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+struct BundledUnitReferenceData {
+    #[serde(rename = "UNIT_NAMES")]
+    unit_names: HashMap<String, String>,
+    #[serde(rename = "EXTRA_UNIT_NAMES")]
+    extra_unit_names: HashMap<String, String>,
+    #[serde(rename = "SHIP_NAME_BY_DEFID")]
+    ship_name_by_defid: HashMap<String, String>,
+    #[serde(rename = "UNIT_NAME_ALIASES")]
+    unit_name_aliases: HashMap<String, String>,
+    #[serde(rename = "KNOWN_SHIP_DEFIDS")]
+    known_ship_defids: Vec<String>,
 }
 
 const UNIT_NAMES_CACHE_FILE: &str = "unit_names.json";
@@ -3116,13 +3130,13 @@ fn legacy_unit_data() -> &'static LegacyUnitData {
         let mut character_defid_keys = HashSet::<String>::new();
         let mut name_index = HashMap::<String, Vec<String>>::new();
 
-        let mut raw_playable = parse_legacy_js_string_map(LEGACY_PLANNER_SOURCE, "const UNIT_NAMES = {");
-        raw_playable.extend(parse_legacy_js_string_map(
-            LEGACY_PLANNER_SOURCE,
-            "const EXTRA_UNIT_NAMES = {",
-        ));
-        let ship_map =
-            parse_legacy_js_string_map(LEGACY_PLANNER_SOURCE, "const SHIP_NAME_BY_DEFID = {");
+        let bundled =
+            serde_json::from_str::<BundledUnitReferenceData>(BUNDLED_UNIT_REFERENCE_JSON)
+                .unwrap_or_default();
+
+        let mut raw_playable = bundled.unit_names;
+        raw_playable.extend(bundled.extra_unit_names);
+        let ship_map = bundled.ship_name_by_defid;
         raw_playable.extend(ship_map.clone());
 
         for (def_id, name) in raw_playable {
@@ -3145,11 +3159,7 @@ fn legacy_unit_data() -> &'static LegacyUnitData {
         for def_id in ship_map.keys() {
             ship_defid_keys.insert(canonical_defid_key(def_id));
         }
-        for def_id in parse_legacy_js_string_array(
-            LEGACY_PLANNER_SOURCE,
-            "const KNOWN_SHIP_DEFIDS = new Set([",
-            "].concat",
-        ) {
+        for def_id in bundled.known_ship_defids {
             ship_defid_keys.insert(canonical_defid_key(&def_id));
         }
 
@@ -3161,9 +3171,7 @@ fn legacy_unit_data() -> &'static LegacyUnitData {
             character_defid_keys.insert(key);
         }
 
-        for (alias, def_id) in
-            parse_legacy_js_string_map(LEGACY_PLANNER_SOURCE, "const UNIT_NAME_ALIASES = {")
-        {
+        for (alias, def_id) in bundled.unit_name_aliases {
             let normalized_alias = normalize_unit_name_lookup(&alias);
             let canonical = normalize_loc_key(&canonical_defid(&def_id));
             if normalized_alias.is_empty() || canonical.is_empty() {
@@ -3198,117 +3206,8 @@ fn legacy_unit_data() -> &'static LegacyUnitData {
     })
 }
 
-fn parse_legacy_js_string_map(source: &str, marker: &str) -> HashMap<String, String> {
-    let Some(block) = extract_legacy_block(source, marker, "\n};") else {
-        return HashMap::new();
-    };
-    let mut out = HashMap::<String, String>::new();
-    for line in block.lines() {
-        let trimmed = line.trim().trim_end_matches(',');
-        if trimmed.is_empty() || trimmed.starts_with("//") || trimmed.starts_with("...") {
-            continue;
-        }
-        let Some((raw_key, raw_value)) = trimmed.split_once(':') else {
-            continue;
-        };
-        let key = parse_legacy_js_key(raw_key.trim());
-        let value = parse_legacy_js_string(raw_value.trim());
-        if let (Some(key), Some(value)) = (key, value) {
-            out.insert(key, value);
-        }
-    }
-    out
-}
-
-fn parse_legacy_js_string_array(source: &str, marker: &str, end_marker: &str) -> Vec<String> {
-    let Some(block) = extract_legacy_block(source, marker, end_marker) else {
-        return Vec::new();
-    };
-    let mut out = Vec::<String>::new();
-    for token in block.split(',') {
-        let trimmed = token.trim();
-        if trimmed.is_empty() || trimmed.starts_with("//") {
-            continue;
-        }
-        if let Some(value) = parse_legacy_js_string(trimmed) {
-            out.push(value);
-        }
-    }
-    out
-}
-
-fn extract_legacy_block<'a>(source: &'a str, marker: &str, end_marker: &str) -> Option<&'a str> {
-    let start = source.find(marker)? + marker.len();
-    let remainder = &source[start..];
-    let end = remainder.find(end_marker)?;
-    Some(&remainder[..end])
-}
-
-fn parse_legacy_js_key(token: &str) -> Option<String> {
-    if token.is_empty() {
-        return None;
-    }
-    if token.starts_with('\'') || token.starts_with('"') {
-        return parse_legacy_js_string(token);
-    }
-    Some(token.trim().to_string())
-}
-
-fn parse_legacy_js_string(token: &str) -> Option<String> {
-    let trimmed = token.trim();
-    let quote = trimmed.chars().next()?;
-    if quote != '\'' && quote != '"' {
-        return None;
-    }
-    let mut out = String::new();
-    let mut escaped = false;
-    for ch in trimmed.chars().skip(1) {
-        if escaped {
-            out.push(ch);
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            escaped = true;
-            continue;
-        }
-        if ch == quote {
-            return Some(out);
-        }
-        out.push(ch);
-    }
-    None
-}
-
 fn load_wiki_ops_names() -> CommandResult<HashMap<String, Vec<Vec<String>>>> {
-    let marker = "_WIKI_OPS_DATA_B64 = \"\"\"";
-    let Some(start) = LEGACY_OPS_FALLBACK.find(marker) else {
-        return Err(CommandError::new(
-            "ops_data",
-            "Could not find the bundled wiki operations data block.",
-        ));
-    };
-    let after_marker = &LEGACY_OPS_FALLBACK[start + marker.len()..];
-    let after_prefix = after_marker
-        .strip_prefix("\\\r\n")
-        .or_else(|| after_marker.strip_prefix("\\\n"))
-        .unwrap_or(after_marker);
-    let Some(end) = after_prefix.find("\"\"\"") else {
-        return Err(CommandError::new(
-            "ops_data",
-            "Could not find the end of the bundled wiki operations data block.",
-        ));
-    };
-    let encoded = after_prefix[..end].lines().collect::<String>();
-    let compressed = BASE64_STANDARD
-        .decode(encoded.as_bytes())
-        .map_err(|error| CommandError::new("ops_data", error.to_string()))?;
-    let mut decoder = ZlibDecoder::new(compressed.as_slice());
-    let mut json_text = String::new();
-    decoder
-        .read_to_string(&mut json_text)
-        .map_err(|error| CommandError::new("ops_data", error.to_string()))?;
-    serde_json::from_str::<HashMap<String, Vec<Vec<String>>>>(&json_text)
+    serde_json::from_str::<HashMap<String, Vec<Vec<String>>>>(BUNDLED_OPS_FALLBACK_JSON)
         .map_err(|error| CommandError::new("ops_data", error.to_string()))
 }
 

@@ -24,6 +24,8 @@ const HOLD_MISSING_PENALTY: i64 = 1_000_000_000;
 const HOLD_SHORT_PENALTY: i64 = 500_000_000;
 const HOLD_PROGRESS_SCORE: i64 = 1_000_000;
 const HOLD_EXCESS_DAY_PENALTY: i64 = 100_000;
+const BONUS_COMPLETION_MISSING_PENALTY: i64 = 1_000_000_000;
+const BONUS_PARTIAL_CLOSE_PENALTY: i64 = 100_000_000;
 const OVERFLOW_PRIMARY_MAX: i64 = 90_000;
 const OVERFLOW_SECONDARY_MAX: i64 = 9_999;
 
@@ -103,6 +105,7 @@ struct BonusActivationState {
     unlocked_on_day: i64,
     banked: i64,
     done: bool,
+    completed: bool,
 }
 
 #[allow(dead_code)]
@@ -270,6 +273,8 @@ struct SimulatedPlan {
     hold_days_kept_open: i64,
     best_extra_star_gap: Option<i64>,
     total_extra_star_gap: i64,
+    bonus_partial_closures: i64,
+    bonus_missing_completions: i64,
 }
 
 pub fn planner_reference() -> PlannerReferenceResponse {
@@ -375,15 +380,19 @@ pub fn build_projection(
         let recommended_fleet_rate = ((recommended_cm_rate as f64) * 0.85).round() as i64;
         let note = if bonus_locked {
             String::from("Bonus locked")
+        } else if is_bonus_planet(planet) && stars >= max_stars_for_planet(planet) {
+            String::from("Full completion achievable")
         } else if stars >= 3 {
             String::from("3 stars achievable")
         } else {
             format!(
-                "{} pts needed for next star",
-                format_number(
-                    (planet.stars.get(stars as usize).copied().unwrap_or(planet.stars[2]) - total_points)
-                        .max(0)
-                )
+                "{} pts needed for {}",
+                format_number((next_star_threshold(planet, stars).unwrap_or(planet.stars[2]) - total_points).max(0)),
+                if is_bonus_planet(planet) {
+                    "full completion"
+                } else {
+                    "next star"
+                }
             )
         };
         let operations_note = if planet_ops_total > 0 {
@@ -1355,6 +1364,9 @@ impl PlannerEngine {
             }
         }
 
+        score -= simulated.bonus_missing_completions * BONUS_COMPLETION_MISSING_PENALTY;
+        score -= simulated.bonus_partial_closures * BONUS_PARTIAL_CLOSE_PENALTY;
+
         score + overflow_opportunity_bonus(
             simulated.best_extra_star_gap,
             simulated.total_extra_star_gap,
@@ -1377,12 +1389,13 @@ impl PlannerEngine {
         let mut hold_tracker = HoldTracker::default();
         let mut best_extra_star_gap = None::<i64>;
         let mut total_extra_star_gap = 0i64;
+        let mut bonus_partial_closures = 0i64;
 
         for day_idx in 0..6usize {
             let day = day_idx as i64 + 1;
             let gp_day = self.gp_for_day(day);
             let mut notices = Vec::<String>::new();
-            let active_bonus_planets = self.get_active_bonus_planets_for_day(&bonus_state, day);
+            let mut active_bonus_planets = self.get_active_bonus_planets_for_day(&bonus_state, day);
 
             let mut preview_priorities = Vec::<PlanetPriority>::new();
             let mut active_planets = HashMap::<String, PlannerPlanetDefinition>::new();
@@ -1455,6 +1468,30 @@ impl PlannerEngine {
                     ops_points_by_planet.insert(pid.clone(), planet.points_earned);
                 }
             }
+            active_bonus_planets.sort_by_key(|(planet, activation)| {
+                let is_hold_bonus = self
+                    .hold_constraint
+                    .as_ref()
+                    .map(|hold| hold.is_bonus && hold.planet_id == planet.id)
+                    .unwrap_or(false);
+                let hold_requires_open_today = self
+                    .hold_constraint
+                    .as_ref()
+                    .map(|hold| {
+                        is_hold_bonus
+                            && hold_tracker.days_kept_open < hold.days
+                            && (day < 6 || hold_tracker.days_kept_open + 1 < hold.days)
+                    })
+                    .unwrap_or(false);
+                if hold_requires_open_today {
+                    i64::MAX
+                } else {
+                    let base = activation.banked
+                        + self.mission_only_points(&planet.id)
+                        + *ops_points_by_planet.get(&planet.id).unwrap_or(&0);
+                    (full_completion_threshold(planet) - base).max(0)
+                }
+            });
 
             let mut bases = HashMap::<String, i64>::new();
             let mut gp_need = HashMap::<String, i64>::new();
@@ -1561,10 +1598,10 @@ impl PlannerEngine {
                             self.hold_constraint
                                 .as_ref()
                                 .map(|hold| hold.hold_cap)
-                                .unwrap_or(planet.stars[0] - 1),
+                                .unwrap_or(unfinished_preload_cap(planet)),
                         )
                     } else {
-                        base.min(planet.stars[0] - 1)
+                        base.min(unfinished_preload_cap(planet))
                     };
                     let safe_banked = raw_safe_banked;
                     if let Some(progress) = state.get_mut(chain_key) {
@@ -1701,7 +1738,7 @@ impl PlannerEngine {
                 let gp_needed = if hold_requires_open_today {
                     0
                 } else {
-                    (planet.stars[2] - base).max(0)
+                    (full_completion_threshold(&planet) - base).max(0)
                 };
                 let gp_used = spare_gp.min(gp_needed);
                 spare_gp -= gp_used;
@@ -1712,18 +1749,24 @@ impl PlannerEngine {
                 } else {
                     stars_at(&planet, pts)
                 };
+                let bonus_partial_close = !hold_requires_open_today
+                    && stars == 0
+                    && pts >= first_reward_threshold(&planet);
                 let carry_over = if hold_requires_open_today {
                     pts.min(
                         self.hold_constraint
                             .as_ref()
                             .map(|hold| hold.hold_cap)
-                            .unwrap_or(planet.stars[0] - 1),
+                            .unwrap_or(unfinished_preload_cap(&planet)),
                     )
-                } else if stars >= 1 {
+                } else if stars >= 1 || bonus_partial_close {
                     0
                 } else {
-                    pts.min(planet.stars[0] - 1)
+                    pts.min(unfinished_preload_cap(&planet))
                 };
+                if bonus_partial_close {
+                    bonus_partial_closures += 1;
+                }
                 if day == 6 {
                     record_next_star_gap(
                         &mut best_extra_star_gap,
@@ -1746,9 +1789,10 @@ impl PlannerEngine {
                 }
 
                 if let Some(state_entry) = bonus_state.get_mut(&planet.id) {
-                    if stars >= 1 {
+                    if stars >= 1 || bonus_partial_close {
                         state_entry.done = true;
                         state_entry.banked = 0;
+                        state_entry.completed = stars >= 1;
                     } else {
                         state_entry.banked = carry_over;
                     }
@@ -1788,6 +1832,10 @@ impl PlannerEngine {
                 });
             }
         }
+        let bonus_missing_completions = bonus_state
+            .values()
+            .filter(|state| state.eligible && !state.completed)
+            .count() as i64;
 
         if !detailed {
             return SimulatedPlan {
@@ -1799,6 +1847,8 @@ impl PlannerEngine {
                 hold_days_kept_open: hold_tracker.days_kept_open,
                 best_extra_star_gap,
                 total_extra_star_gap,
+                bonus_partial_closures,
+                bonus_missing_completions,
             };
         }
 
@@ -1824,6 +1874,8 @@ impl PlannerEngine {
             hold_days_kept_open: hold_tracker.days_kept_open,
             best_extra_star_gap,
             total_extra_star_gap,
+            bonus_partial_closures,
+            bonus_missing_completions,
         }
     }
 
@@ -2426,7 +2478,7 @@ impl PlannerEngine {
                 .iter()
                 .filter(|slot_idx| !platoon_state.filled[**slot_idx])
                 .count();
-            requirement.candidate_ids.len() >= remaining
+            remaining == 0 || !requirement.candidate_ids.is_empty()
         })
     }
 
@@ -2655,7 +2707,7 @@ fn build_precomputed_ops_model(
 
             if grouped_requirements
                 .iter()
-                .any(|requirement| requirement.candidate_ids.len() < requirement.slot_indices.len())
+                .any(|requirement| requirement.candidate_ids.is_empty())
             {
                 precomputed_planet.ignored_impossible_platoons += 1;
                 continue;
@@ -2750,15 +2802,30 @@ fn record_next_star_gap(
     *total_gap += gap;
 }
 
-fn next_star_gap(planet: &PlannerPlanetDefinition, stars: i64, pts: i64) -> Option<i64> {
+fn next_star_threshold(planet: &PlannerPlanetDefinition, stars: i64) -> Option<i64> {
     if stars < 0 {
         return None;
     }
-    let next_star_idx = stars as usize;
-    let threshold = planet.stars.get(next_star_idx).copied()?;
-    if threshold <= 0 {
-        return None;
+    if is_bonus_planet(planet) {
+        let threshold = full_completion_threshold(planet);
+        if stars >= 1 || threshold <= 0 {
+            None
+        } else {
+            Some(threshold)
+        }
+    } else {
+        let next_star_idx = stars as usize;
+        let threshold = planet.stars.get(next_star_idx).copied()?;
+        if threshold <= 0 {
+            None
+        } else {
+            Some(threshold)
+        }
     }
+}
+
+fn next_star_gap(planet: &PlannerPlanetDefinition, stars: i64, pts: i64) -> Option<i64> {
+    let threshold = next_star_threshold(planet, stars)?;
     Some((threshold - pts).max(0))
 }
 
@@ -2957,6 +3024,7 @@ fn create_bonus_activation_state(
                     unlocked_on_day: 0,
                     banked: 0,
                     done: false,
+                    completed: false,
                 },
             )
         })
@@ -3181,7 +3249,38 @@ fn project_fleet_points(mission: &PlannerMissionDefinition, expected_completions
     round_to_i64(expected_completions) * full
 }
 
+fn is_bonus_planet(planet: &PlannerPlanetDefinition) -> bool {
+    planet.chain == "bonus"
+}
+
+fn max_stars_for_planet(planet: &PlannerPlanetDefinition) -> i64 {
+    if is_bonus_planet(planet) {
+        1
+    } else {
+        planet.stars.len() as i64
+    }
+}
+
+fn full_completion_threshold(planet: &PlannerPlanetDefinition) -> i64 {
+    planet.stars.last().copied().unwrap_or_default().max(0)
+}
+
+fn first_reward_threshold(planet: &PlannerPlanetDefinition) -> i64 {
+    planet.stars.first().copied().unwrap_or_default().max(0)
+}
+
+fn unfinished_preload_cap(planet: &PlannerPlanetDefinition) -> i64 {
+    (first_reward_threshold(planet) - 1).max(0)
+}
+
 fn stars_at(planet: &PlannerPlanetDefinition, points: i64) -> i64 {
+    if is_bonus_planet(planet) {
+        return if points >= full_completion_threshold(planet) {
+            1
+        } else {
+            0
+        };
+    }
     planet
         .stars
         .iter()
@@ -3346,7 +3445,7 @@ fn build_hold_constraint(
     let max_days = (7 - planet.phase).clamp(1, 6);
     let days = hold.days.clamp(1, max_days);
     let latest_start_day = (7 - days).clamp(1, 6);
-    let hold_cap = (planet.stars.first().copied().unwrap_or_default() / 2).max(0);
+    let hold_cap = unfinished_preload_cap(planet);
 
     if planet.chain == "bonus" {
         let source_id = planet.unlocked_by.as_deref()?;

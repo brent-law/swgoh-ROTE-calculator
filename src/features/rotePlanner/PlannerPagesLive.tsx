@@ -2359,10 +2359,12 @@ export function ExportPreviewPage() {
   const location = useLocation();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const releasedRef = useRef(false);
+  const closingRef = useRef(false);
   const [preview, setPreview] = useState<ExportPreviewResponse | null>(null);
   const [activeDocumentId, setActiveDocumentId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [closing, setClosing] = useState(false);
   const token = exportPreviewTokenFromSearch(location.search);
 
   const releasePreview = () => {
@@ -2410,19 +2412,6 @@ export function ExportPreviewPage() {
   }, [token]);
 
   useEffect(() => {
-    if (!token) return;
-
-    const handleBeforeUnload = () => {
-      void releasePreview();
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [token]);
-
-  useEffect(() => {
     if (!preview) return;
     document.title = preview.title;
   }, [preview]);
@@ -2449,10 +2438,35 @@ export function ExportPreviewPage() {
   };
 
   const handleClose = () => {
-    void releasePreview();
-    void getCurrentWebviewWindow()
-      .close()
-      .catch(() => window.close());
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing(true);
+
+    const currentWindow = getCurrentWebviewWindow();
+    void (async () => {
+      try {
+        await currentWindow.hide();
+      } catch {
+        // Browser/dev fallback: hiding only exists inside Tauri.
+      }
+
+      try {
+        await currentWindow.destroy();
+        return;
+      } catch {
+        // If destroy is unavailable, fall back to the normal close path.
+      }
+
+      try {
+        await currentWindow.close();
+        return;
+      } catch {
+        await releasePreview();
+        window.close();
+        closingRef.current = false;
+        setClosing(false);
+      }
+    })();
   };
 
   return (
@@ -2477,8 +2491,13 @@ export function ExportPreviewPage() {
           >
             Print
           </button>
-          <button type="button" className={styles.secondaryButton} onClick={handleClose}>
-            Close
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={handleClose}
+            disabled={closing}
+          >
+            {closing ? "Closing..." : "Close"}
           </button>
         </div>
       </div>

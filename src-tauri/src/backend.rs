@@ -1,18 +1,17 @@
 use crate::error::{CommandError, CommandResult};
 use crate::models::{
     BootstrapResponse, BulkRosterScanResponse, BulkScanGuildRostersRequest, ComlinkStatusResponse,
-    ExportPreviewDocument, ExportPreviewResponse, ExportPreviewTokenRequest, GuildImportRequest,
-    GuildImportResponse, GuildMember, GuildRosters, GuildScanProgressEvent, GuildSummary,
-    GuideTbOmicron, GuideTbOmicronMap, GuideTbOmicronResponse, GuideUnitCatalogEntry,
-    GuideUnitCatalogResponse, ImportSessionRequest, ImportSessionResponse, LoadAppStateResponse,
+    ExportPreviewDocument, ExportPreviewResponse, ExportPreviewTokenRequest, GuideTbOmicron,
+    GuideTbOmicronMap, GuideTbOmicronResponse, GuideUnitCatalogEntry, GuideUnitCatalogResponse,
+    GuildImportRequest, GuildImportResponse, GuildMember, GuildRosters, GuildScanProgressEvent,
+    GuildSummary, ImportSessionRequest, ImportSessionResponse, LoadAppStateResponse,
     OpenExportPreviewRequest, OpenExportPreviewResponse, OpsDefinitions, OpsDefinitionsResponse,
     PlannerOptimizationProgressEvent, PlannerOptimizationRequest, PlannerOptimizationResponse,
     PlannerProjectionRequest, PlannerProjectionResponse, PlannerReferenceResponse,
     PlatoonAnalysisEntry, PlatoonAnalysisMap, PlatoonAnalysisResponse, PlatoonRequirement,
     PlatoonSlotAnalysis, ReleaseExportPreviewResponse, ResetScanSessionResponse,
-    RosterScanResponse, SaveAppStateRequest, SaveAppStateResponse, ScanFailure,
-    SessionSnapshot, SimplifiedRosterUnit, SimplifiedSkillRow, WriteExportBundleRequest,
-    WriteExportBundleResponse,
+    RosterScanResponse, SaveAppStateRequest, SaveAppStateResponse, ScanFailure, SessionSnapshot,
+    SimplifiedRosterUnit, SimplifiedSkillRow, WriteExportBundleRequest, WriteExportBundleResponse,
 };
 use crate::planner;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -371,8 +370,7 @@ pub async fn scan_guild_rosters(
             last_error: None,
         },
     );
-    let (result_tx, mut result_rx) =
-        tokio::sync::mpsc::unbounded_channel::<GuildScanTaskResult>();
+    let (result_tx, mut result_rx) = tokio::sync::mpsc::unbounded_channel::<GuildScanTaskResult>();
     let mut pending_members = scan_members.into_iter();
     let mut next_member = pending_members.next();
     let mut in_flight = 0usize;
@@ -450,7 +448,8 @@ pub async fn scan_guild_rosters(
             continue;
         }
 
-        let can_launch_later = !scan_stopped && next_member.is_some() && in_flight < SCAN_MAX_IN_FLIGHT;
+        let can_launch_later =
+            !scan_stopped && next_member.is_some() && in_flight < SCAN_MAX_IN_FLIGHT;
         let recv_result = if can_launch_later {
             let wait_duration =
                 next_launch_at.saturating_duration_since(tokio::time::Instant::now());
@@ -537,8 +536,7 @@ pub async fn scan_guild_rosters(
         .iter()
         .map(|(_, player)| player.clone())
         .collect::<Vec<_>>();
-    let (power_ready, power_error) =
-        try_apply_statcalc_power(&app_handle, &mut successful_rosters);
+    let (power_ready, power_error) = try_apply_statcalc_power(&app_handle, &mut successful_rosters);
 
     let guild_rosters = {
         let state = app_handle.state::<BackendState>();
@@ -619,9 +617,7 @@ pub async fn analyze_platoons(app_handle: AppHandle) -> CommandResult<PlatoonAna
     })
 }
 
-pub async fn get_guide_tb_omicrons(
-    app_handle: AppHandle,
-) -> CommandResult<GuideTbOmicronResponse> {
+pub async fn get_guide_tb_omicrons(app_handle: AppHandle) -> CommandResult<GuideTbOmicronResponse> {
     let state = app_handle.state::<BackendState>();
     let mut runtime = state.runtime.lock().await;
     ensure_localization_maps(&app_handle, &mut runtime).await?;
@@ -671,7 +667,8 @@ pub async fn write_export_bundle(
         fs::remove_dir_all(&bundle_dir)
             .map_err(|error| CommandError::new("export", error.to_string()))?;
     }
-    fs::create_dir_all(&bundle_dir).map_err(|error| CommandError::new("export", error.to_string()))?;
+    fs::create_dir_all(&bundle_dir)
+        .map_err(|error| CommandError::new("export", error.to_string()))?;
 
     let mut open_path = None::<PathBuf>;
     let requested_open_name = sanitize_export_file_name(&request.open_file_name);
@@ -682,7 +679,8 @@ pub async fn write_export_bundle(
             continue;
         }
         let path = bundle_dir.join(&file_name);
-        fs::write(&path, file.contents).map_err(|error| CommandError::new("export", error.to_string()))?;
+        fs::write(&path, file.contents)
+            .map_err(|error| CommandError::new("export", error.to_string()))?;
         if file_name == requested_open_name {
             open_path = Some(path);
         }
@@ -773,7 +771,10 @@ pub async fn open_export_preview(
         return Err(CommandError::new("export_preview", error.to_string()));
     }
 
-    Ok(OpenExportPreviewResponse { token, window_label })
+    Ok(OpenExportPreviewResponse {
+        token,
+        window_label,
+    })
 }
 
 pub async fn get_export_preview(
@@ -806,7 +807,10 @@ pub async fn release_export_preview(
 ) -> CommandResult<ReleaseExportPreviewResponse> {
     let state = app_handle.state::<BackendState>();
     let mut runtime = state.runtime.lock().await;
-    let released = runtime.export_previews.remove(request.token.trim()).is_some();
+    let released = runtime
+        .export_previews
+        .remove(request.token.trim())
+        .is_some();
     Ok(ReleaseExportPreviewResponse { released })
 }
 
@@ -905,15 +909,18 @@ async fn refresh_comlink_status_internal(
     let mut runtime = state.runtime.lock().await;
     let binary_path = find_existing_comlink_binary(app_handle, &mut runtime)
         .map(|path| path.display().to_string())
-        .or_else(|| runtime.comlink_binary.as_ref().map(|path| path.display().to_string()));
+        .or_else(|| {
+            runtime
+                .comlink_binary
+                .as_ref()
+                .map(|path| path.display().to_string())
+        });
 
     match comlink_metadata().await {
         Ok(meta) => {
-            let version = first_non_empty_string(
-                &meta,
-                &["latestGamedataVersion", "gameVersion", "version"],
-            )
-            .unwrap_or_else(|| String::from("?"));
+            let version =
+                first_non_empty_string(&meta, &["latestGamedataVersion", "gameVersion", "version"])
+                    .unwrap_or_else(|| String::from("?"));
             Ok(ComlinkStatusResponse {
                 comlink: String::from("online"),
                 port: COMLINK_PORT,
@@ -1042,7 +1049,9 @@ async fn scan_roster_internal(
         let state = app_handle.state::<BackendState>();
         let mut runtime = state.runtime.lock().await;
         (simplified, skipped) = simplify_player_roster(&runtime, &player);
-        runtime.guild_rosters.insert(normalized.clone(), simplified.clone());
+        runtime
+            .guild_rosters
+            .insert(normalized.clone(), simplified.clone());
         runtime.guide_tb_omicron_cache = None;
         runtime.ops_defs_cache = None;
     }
@@ -1335,7 +1344,8 @@ async fn recover_comlink_for_scan(app_handle: &AppHandle) -> bool {
             return true;
         }
 
-        if restart_comlink_for_recovery(app_handle).await.is_ok() && comlink_metadata().await.is_ok()
+        if restart_comlink_for_recovery(app_handle).await.is_ok()
+            && comlink_metadata().await.is_ok()
         {
             return true;
         }
@@ -1462,11 +1472,14 @@ async fn ensure_localization_maps(
     let meta = comlink_metadata().await.unwrap_or_else(|_| json!({}));
     let bundle_id = first_non_empty_string(
         &meta,
-        &["latestLocalizationBundleVersion", "localizationBundleVersion"],
+        &[
+            "latestLocalizationBundleVersion",
+            "localizationBundleVersion",
+        ],
     )
     .unwrap_or_default();
-    let game_version =
-        first_non_empty_string(&meta, &["latestGamedataVersion", "gameVersion"]).unwrap_or_default();
+    let game_version = first_non_empty_string(&meta, &["latestGamedataVersion", "gameVersion"])
+        .unwrap_or_default();
 
     let mut localization_payloads = Vec::new();
     if !bundle_id.is_empty() {
@@ -1496,10 +1509,7 @@ async fn ensure_localization_maps(
     Ok(())
 }
 
-async fn populate_gamedata_maps(
-    runtime: &mut BackendRuntime,
-    version: &str,
-) -> CommandResult<()> {
+async fn populate_gamedata_maps(runtime: &mut BackendRuntime, version: &str) -> CommandResult<()> {
     let (skill_data, ability_data, unit_data) = tokio::try_join!(
         comlink_post(
             "data",
@@ -1536,7 +1546,9 @@ async fn populate_gamedata_maps(
             let ability_id = first_non_empty_string(ability, &["id"]).unwrap_or_default();
             let name = lookup_localized_text(
                 runtime,
-                first_non_empty_string(ability, &["nameKey"]).as_deref().unwrap_or_default(),
+                first_non_empty_string(ability, &["nameKey"])
+                    .as_deref()
+                    .unwrap_or_default(),
             );
             if !ability_id.is_empty() && !name.is_empty() {
                 store_ability_name(runtime, &ability_id, &name);
@@ -1561,7 +1573,9 @@ async fn populate_gamedata_maps(
             if name.is_empty() {
                 name = lookup_localized_text(
                     runtime,
-                    first_non_empty_string(skill, &["nameKey"]).as_deref().unwrap_or_default(),
+                    first_non_empty_string(skill, &["nameKey"])
+                        .as_deref()
+                        .unwrap_or_default(),
                 );
             }
             if !name.is_empty() {
@@ -1608,7 +1622,9 @@ async fn populate_gamedata_maps(
             let normalized = normalize_loc_key(&base_id);
             let name = lookup_localized_text(
                 runtime,
-                first_non_empty_string(unit, &["nameKey"]).as_deref().unwrap_or_default(),
+                first_non_empty_string(unit, &["nameKey"])
+                    .as_deref()
+                    .unwrap_or_default(),
             );
             if !name.is_empty() {
                 runtime.unit_name_map.insert(normalized.clone(), name);
@@ -1623,12 +1639,13 @@ async fn populate_gamedata_maps(
             let mut crew_skill_ids = Vec::new();
             if let Some(crew_entries) = unit.get("crew").and_then(Value::as_array) {
                 for crew_entry in crew_entries {
-                    if let Some(unit_id) =
-                        first_non_empty_string(crew_entry, &["unitId"]).filter(|value| !value.is_empty())
+                    if let Some(unit_id) = first_non_empty_string(crew_entry, &["unitId"])
+                        .filter(|value| !value.is_empty())
                     {
                         crew_unit_ids.push(normalize_loc_key(&unit_id));
                     }
-                    crew_skill_ids.extend(extract_skill_ids(crew_entry.get("skillReference"), true));
+                    crew_skill_ids
+                        .extend(extract_skill_ids(crew_entry.get("skillReference"), true));
                 }
             }
             runtime
@@ -1645,7 +1662,9 @@ async fn populate_gamedata_maps(
                     .and_then(Value::as_array)
                     .map_or(false, |crew| !crew.is_empty())
             {
-                runtime.known_ship_defids.insert(canonical_defid_key(&base_id));
+                runtime
+                    .known_ship_defids
+                    .insert(canonical_defid_key(&base_id));
             } else {
                 runtime
                     .known_character_defids
@@ -1697,7 +1716,13 @@ fn simplify_roster_unit(runtime: &BackendRuntime, unit: &Value) -> Option<Simpli
         ),
         gear: extract_i64_with_default(
             unit,
-            &["currentTier", "gear", "currentGear", "gearLevel", "gearTier"],
+            &[
+                "currentTier",
+                "gear",
+                "currentGear",
+                "gearLevel",
+                "gearTier",
+            ],
             0,
         ),
         relic: relic_level,
@@ -1718,11 +1743,14 @@ fn simplify_skills(
     combat_type: i64,
 ) -> Vec<SimplifiedSkillRow> {
     let mut roster_skill_tiers = HashMap::<String, i64>::new();
-    if let Some(skills) = unit.get("skill").or_else(|| unit.get("skills")).and_then(Value::as_array)
+    if let Some(skills) = unit
+        .get("skill")
+        .or_else(|| unit.get("skills"))
+        .and_then(Value::as_array)
     {
         for skill in skills {
-            let skill_id = first_non_empty_string(skill, &["id", "skillId", "abilityId"])
-                .unwrap_or_default();
+            let skill_id =
+                first_non_empty_string(skill, &["id", "skillId", "abilityId"]).unwrap_or_default();
             if skill_id.is_empty() {
                 continue;
             }
@@ -1867,7 +1895,9 @@ fn collect_unit_skill_ids(runtime: &BackendRuntime, def_id: &str, combat_type: i
             push(values);
         } else if let Some(crew_units) = runtime.unit_crew_map.get(&base_key) {
             for crew_unit in crew_units {
-                if let Some(values) = runtime.unit_skill_reference_map.get(&normalize_loc_key(crew_unit))
+                if let Some(values) = runtime
+                    .unit_skill_reference_map
+                    .get(&normalize_loc_key(crew_unit))
                 {
                     let first = values.first().cloned().into_iter().collect::<Vec<_>>();
                     push(&first);
@@ -1898,7 +1928,11 @@ fn build_guide_tb_omicron_map(runtime: &mut BackendRuntime) -> GuideTbOmicronMap
                 continue;
             }
             seen.insert(skill_key.clone());
-            let meta = runtime.skill_meta_map.get(&skill_key).cloned().unwrap_or_default();
+            let meta = runtime
+                .skill_meta_map
+                .get(&skill_key)
+                .cloned()
+                .unwrap_or_default();
             if !meta.is_omicron || meta.omicron_area != 7 {
                 continue;
             }
@@ -1932,7 +1966,9 @@ fn build_guide_unit_catalog(runtime: &BackendRuntime) -> Vec<GuideUnitCatalogEnt
             return;
         }
 
-        let name = lookup_unit_name(runtime, def_id, fallback_name).trim().to_string();
+        let name = lookup_unit_name(runtime, def_id, fallback_name)
+            .trim()
+            .to_string();
         if name.is_empty() || name == "(unknown)" {
             return;
         }
@@ -1944,7 +1980,9 @@ fn build_guide_unit_catalog(runtime: &BackendRuntime) -> Vec<GuideUnitCatalogEnt
         };
 
         match entries.get(&key) {
-            Some(existing) if existing.name != existing.def_id || next.name == next.def_id => return,
+            Some(existing) if existing.name != existing.def_id || next.name == next.def_id => {
+                return
+            }
             _ => {}
         }
 
@@ -1981,7 +2019,10 @@ fn load_ops_definitions_internal(runtime: &mut BackendRuntime) -> CommandResult<
     let mut defs = HashMap::<String, Vec<Vec<PlatoonRequirement>>>::new();
 
     for (planet_id, platoons) in wiki_names {
-        let relic = zone_relic_by_planet.get(planet_id.as_str()).copied().unwrap_or(0);
+        let relic = zone_relic_by_planet
+            .get(planet_id.as_str())
+            .copied()
+            .unwrap_or(0);
         let mut built = Vec::new();
         for platoon in platoons {
             let mut slots = Vec::new();
@@ -2013,22 +2054,28 @@ fn load_ops_definitions_internal(runtime: &mut BackendRuntime) -> CommandResult<
     Ok(defs)
 }
 
-fn analyze_platoons_internal(runtime: &BackendRuntime, defs: &OpsDefinitions) -> PlatoonAnalysisMap {
+fn analyze_platoons_internal(
+    runtime: &BackendRuntime,
+    defs: &OpsDefinitions,
+) -> PlatoonAnalysisMap {
     let mut out = HashMap::<String, Vec<PlatoonAnalysisEntry>>::new();
     for (planet_id, platoons) in defs {
         let mut planet_rows = Vec::new();
         for platoon in platoons {
             let mut needs = HashMap::<String, PlatoonSlotAnalysis>::new();
             for slot in platoon {
-                let entry = needs.entry(slot.def_id.clone()).or_insert_with(|| PlatoonSlotAnalysis {
-                    def_id: slot.def_id.clone(),
-                    name: slot.name.clone(),
-                    need: 0,
-                    have: 0,
-                    min_rarity: slot.min_rarity,
-                    min_relic: slot.min_relic,
-                    ok: false,
-                });
+                let entry =
+                    needs
+                        .entry(slot.def_id.clone())
+                        .or_insert_with(|| PlatoonSlotAnalysis {
+                            def_id: slot.def_id.clone(),
+                            name: slot.name.clone(),
+                            need: 0,
+                            have: 0,
+                            min_rarity: slot.min_rarity,
+                            min_relic: slot.min_relic,
+                            ok: false,
+                        });
                 entry.need += 1;
             }
 
@@ -2040,12 +2087,15 @@ fn analyze_platoons_internal(runtime: &BackendRuntime, defs: &OpsDefinitions) ->
                 let mut have = 0i64;
                 for roster in runtime.guild_rosters.values() {
                     for unit in roster {
-                        let unit_name_key =
-                            normalize_unit_name_lookup(&lookup_unit_name(runtime, &unit.def_id, &unit.name));
+                        let unit_name_key = normalize_unit_name_lookup(&lookup_unit_name(
+                            runtime,
+                            &unit.def_id,
+                            &unit.name,
+                        ));
                         let names_match = if requirement.def_id.starts_with("WIKI_") {
                             unit_name_key == target_name
                         } else {
-                            canonical_defid(&unit.def_id) == canonical_defid(&requirement.def_id)
+                            ops_defids_match(&unit.def_id, &requirement.def_id)
                                 || (!target_name.is_empty() && unit_name_key == target_name)
                         };
                         if !names_match {
@@ -2099,7 +2149,8 @@ fn save_app_state_to_disk(app_handle: &AppHandle, snapshot: Value) -> CommandRes
     let sanitized = sanitize_persisted_app_state(snapshot);
     let payload = serde_json::to_string_pretty(&sanitized)
         .map_err(|error| CommandError::new("app_state_serialize", error.to_string()))?;
-    fs::write(&path, payload).map_err(|error| CommandError::new("app_state_write", error.to_string()))
+    fs::write(&path, payload)
+        .map_err(|error| CommandError::new("app_state_write", error.to_string()))
 }
 
 fn clone_number_or_null(value: Option<&Value>) -> Option<Value> {
@@ -2133,10 +2184,14 @@ fn sanitize_persisted_planet_state(value: &Value) -> Option<Value> {
         "fleetRateOverride",
         "cmCountOverride",
         "fleetCountOverride",
+        "smCount",
     ] {
         if let Some(number) = clone_number_or_null(object.get(key)) {
             sanitized.insert(String::from(key), number);
         }
+    }
+    if let Some(sm_ready) = object.get("smReady").and_then(Value::as_bool) {
+        sanitized.insert(String::from("smReady"), Value::Bool(sm_ready));
     }
 
     let mission_overrides = object
@@ -2539,7 +2594,10 @@ fn score_comlink_asset(name: &str, os_name: &str, arch: &str, archive_hints: &[S
     if lower.contains("comlink") {
         score += 2;
     }
-    if archive_hints.iter().any(|ext| lower.ends_with(ext) || lower.contains(ext)) {
+    if archive_hints
+        .iter()
+        .any(|ext| lower.ends_with(ext) || lower.contains(ext))
+    {
         score += 3;
     }
     score
@@ -2549,8 +2607,8 @@ fn extract_comlink_archive(asset_name: &str, bytes: &[u8], root: &Path) -> Comma
     let lower = asset_name.to_lowercase();
     if lower.ends_with(".zip") {
         let cursor = Cursor::new(bytes.to_vec());
-        let mut archive =
-            ZipArchive::new(cursor).map_err(|error| CommandError::new("comlink_extract", error.to_string()))?;
+        let mut archive = ZipArchive::new(cursor)
+            .map_err(|error| CommandError::new("comlink_extract", error.to_string()))?;
         archive
             .extract(root)
             .map_err(|error| CommandError::new("comlink_extract", error.to_string()))?;
@@ -2600,7 +2658,10 @@ fn mark_comlink_binary_executable(path: &Path) -> CommandResult<()> {
         let metadata = fs::metadata(path).map_err(|error| {
             CommandError::new(
                 "comlink_binary",
-                format!("Could not inspect swgoh-comlink binary '{}': {error}", path.display()),
+                format!(
+                    "Could not inspect swgoh-comlink binary '{}': {error}",
+                    path.display()
+                ),
             )
         })?;
         let mut permissions = metadata.permissions();
@@ -2650,22 +2711,17 @@ fn looks_like_comlink_binary(path: &Path) -> bool {
     if !path.is_file() {
         return false;
     }
-    let Some(name) = path.file_name().map(|value| value.to_string_lossy().to_lowercase()) else {
+    let Some(name) = path
+        .file_name()
+        .map(|value| value.to_string_lossy().to_lowercase())
+    else {
         return false;
     };
     if !name.contains("swgoh-comlink") {
         return false;
     }
     if [
-        ".zip",
-        ".tgz",
-        ".tar.gz",
-        ".tar",
-        ".gz",
-        ".json",
-        ".yaml",
-        ".yml",
-        ".html",
+        ".zip", ".tgz", ".tar.gz", ".tar", ".gz", ".json", ".yaml", ".yml", ".html",
     ]
     .iter()
     .any(|suffix| name.ends_with(suffix))
@@ -2737,7 +2793,10 @@ fn normalize_guild_summary(guild_payload: &Value) -> CommandResult<GuildSummary>
         &[&["guildPower"], &["galacticPower"], &["galactic_power"]],
     )
     .or_else(|| {
-        extract_i64_from_paths(root, &[&["guildPower"], &["galacticPower"], &["galactic_power"]])
+        extract_i64_from_paths(
+            root,
+            &[&["guildPower"], &["galacticPower"], &["galactic_power"]],
+        )
     })
     .unwrap_or(0);
 
@@ -2759,7 +2818,10 @@ fn normalize_guild_summary(guild_payload: &Value) -> CommandResult<GuildSummary>
         .collect::<Vec<_>>();
 
     if gp <= 0 {
-        gp = normalized_members.iter().map(|member| member.galactic_power).sum();
+        gp = normalized_members
+            .iter()
+            .map(|member| member.galactic_power)
+            .sum();
     }
 
     Ok(GuildSummary {
@@ -2988,7 +3050,11 @@ fn localization_maps_ready(runtime: &BackendRuntime) -> bool {
 
 fn app_data_root_from_runtime_path_hint() -> Option<PathBuf> {
     let local_app_data = std::env::var("LOCALAPPDATA").ok()?;
-    Some(PathBuf::from(local_app_data).join("com.swgoh-toolkit.app").join(".comlink"))
+    Some(
+        PathBuf::from(local_app_data)
+            .join("com.swgoh-toolkit.app")
+            .join(".comlink"),
+    )
 }
 
 fn extract_localization_bundle(value: &Value) -> HashMap<String, String> {
@@ -3030,11 +3096,7 @@ fn parse_localization_archive_or_text(raw: &[u8]) -> HashMap<String, String> {
             let Ok(file) = archive.by_index(index) else {
                 continue;
             };
-            if file
-                .name()
-                .to_ascii_uppercase()
-                .ends_with("LOC_ENG_US.TXT")
-            {
+            if file.name().to_ascii_uppercase().ends_with("LOC_ENG_US.TXT") {
                 selected_index = Some(index);
                 break;
             }
@@ -3068,10 +3130,7 @@ fn parse_localization_text(text: &str) -> HashMap<String, String> {
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
-        let Some((key, value)) = trimmed
-            .split_once('|')
-            .or_else(|| trimmed.split_once('='))
-        else {
+        let Some((key, value)) = trimmed.split_once('|').or_else(|| trimmed.split_once('=')) else {
             continue;
         };
         let clean_key = normalize_loc_key(key);
@@ -3130,9 +3189,8 @@ fn legacy_unit_data() -> &'static LegacyUnitData {
         let mut character_defid_keys = HashSet::<String>::new();
         let mut name_index = HashMap::<String, Vec<String>>::new();
 
-        let bundled =
-            serde_json::from_str::<BundledUnitReferenceData>(BUNDLED_UNIT_REFERENCE_JSON)
-                .unwrap_or_default();
+        let bundled = serde_json::from_str::<BundledUnitReferenceData>(BUNDLED_UNIT_REFERENCE_JSON)
+            .unwrap_or_default();
 
         let mut raw_playable = bundled.unit_names;
         raw_playable.extend(bundled.extra_unit_names);
@@ -3152,7 +3210,10 @@ fn legacy_unit_data() -> &'static LegacyUnitData {
                 .or_insert_with(|| name.clone());
             let normalized_name = normalize_unit_name_lookup(&name);
             if !normalized_name.is_empty() {
-                name_index.entry(normalized_name).or_default().push(canonical.clone());
+                name_index
+                    .entry(normalized_name)
+                    .or_default()
+                    .push(canonical.clone());
             }
         }
 
@@ -3238,7 +3299,14 @@ fn zone_relic_by_planet() -> HashMap<&'static str, i64> {
 
 fn resolve_unit_name_to_defid(runtime: &BackendRuntime, name: &str) -> Option<String> {
     let legacy = legacy_unit_data();
-    let raw = canonical_defid(name);
+    let target = normalize_unit_name_lookup(name);
+    if !target.is_empty() {
+        if let Some(def_id) = legacy.alias_by_name.get(&target) {
+            return Some(canonical_ops_defid(def_id));
+        }
+    }
+
+    let raw = canonical_ops_defid(name);
     let raw_key = canonical_defid_key(&raw);
     if runtime.known_ship_defids.contains(&raw_key)
         || runtime.known_character_defids.contains(&raw_key)
@@ -3252,28 +3320,23 @@ fn resolve_unit_name_to_defid(runtime: &BackendRuntime, name: &str) -> Option<St
         return Some(raw);
     }
 
-    let target = normalize_unit_name_lookup(name);
     if target.is_empty() {
         return None;
     }
 
-    if let Some(def_id) = legacy.alias_by_name.get(&target) {
-        return Some(def_id.clone());
-    }
-
     let mut matches = HashSet::<String>::new();
     if let Some(def_ids) = legacy.name_index.get(&target) {
-        matches.extend(def_ids.iter().cloned());
+        matches.extend(def_ids.iter().map(|def_id| canonical_ops_defid(def_id)));
     }
     for (def_id, display_name) in &runtime.unit_name_map {
         if normalize_unit_name_lookup(display_name) == target {
-            matches.insert(normalize_loc_key(&canonical_defid(def_id)));
+            matches.insert(canonical_ops_defid(def_id));
         }
     }
     for roster in runtime.guild_rosters.values() {
         for unit in roster {
             if normalize_unit_name_lookup(&unit.name) == target {
-                matches.insert(normalize_loc_key(&canonical_defid(&unit.def_id)));
+                matches.insert(canonical_ops_defid(&unit.def_id));
             }
         }
     }
@@ -3296,7 +3359,7 @@ fn placeholder_ops_defid(name: &str) -> String {
 
 fn is_ship_name_or_defid(runtime: &BackendRuntime, name: &str, def_id: &str) -> bool {
     let legacy = legacy_unit_data();
-    let def_key = canonical_defid_key(def_id);
+    let def_key = canonical_defid_key(&canonical_ops_defid(def_id));
     if runtime.known_ship_defids.contains(&def_key) || legacy.ship_defid_keys.contains(&def_key) {
         return true;
     }
@@ -3353,15 +3416,25 @@ fn is_ship_name_or_defid(runtime: &BackendRuntime, name: &str, def_id: &str) -> 
 
 fn lookup_unit_name(runtime: &BackendRuntime, def_id: &str, fallback: &str) -> String {
     let legacy = legacy_unit_data();
-    let raw = canonical_defid(def_id);
+    let raw = canonical_ops_defid(def_id);
     let normalized = normalize_loc_key(&raw);
     runtime
         .unit_name_map
         .get(&normalized)
         .cloned()
-        .or_else(|| runtime.unit_name_map.get(&normalized.replace('_', "")).cloned())
+        .or_else(|| {
+            runtime
+                .unit_name_map
+                .get(&normalized.replace('_', ""))
+                .cloned()
+        })
         .or_else(|| legacy.playable_names.get(&normalized).cloned())
-        .or_else(|| legacy.playable_names.get(&normalized.replace('_', "")).cloned())
+        .or_else(|| {
+            legacy
+                .playable_names
+                .get(&normalized.replace('_', ""))
+                .cloned()
+        })
         .unwrap_or_else(|| fallback.to_string())
 }
 
@@ -3448,7 +3521,12 @@ fn lookup_localized_text(runtime: &BackendRuntime, key: &str) -> String {
         .localization_value_map
         .get(&normalized)
         .cloned()
-        .or_else(|| runtime.localization_value_map.get(&normalized.replace('_', "")).cloned())
+        .or_else(|| {
+            runtime
+                .localization_value_map
+                .get(&normalized.replace('_', ""))
+                .cloned()
+        })
         .unwrap_or_default()
 }
 
@@ -3459,9 +3537,13 @@ fn extract_skill_ids(value: Option<&Value>, first_only: bool) -> Vec<String> {
         return out;
     };
 
-    for entry in values.iter().take(if first_only { 1 } else { values.len() }) {
+    for entry in values
+        .iter()
+        .take(if first_only { 1 } else { values.len() })
+    {
         let skill_id = if let Some(map) = entry.as_object() {
-            first_non_empty_string_from_map(map, &["skillId", "id", "abilityId"]).unwrap_or_default()
+            first_non_empty_string_from_map(map, &["skillId", "id", "abilityId"])
+                .unwrap_or_default()
         } else {
             entry.as_str().unwrap_or_default().to_string()
         };
@@ -3500,11 +3582,9 @@ fn extract_speed(unit: &Value) -> i64 {
         };
 
         for stat in stats {
-            let stat_id = first_non_empty_string(
-                &stat,
-                &["unitStatId", "statId", "id", "statType"],
-            )
-            .unwrap_or_default();
+            let stat_id =
+                first_non_empty_string(&stat, &["unitStatId", "statId", "id", "statType"])
+                    .unwrap_or_default();
             if stat_id != "5" && stat_id != "UNIT_STAT_SPEED" && stat_id.to_lowercase() != "speed" {
                 continue;
             }
@@ -3542,9 +3622,8 @@ fn extract_authoritative_unit_power(unit: &Value) -> i64 {
 }
 
 fn extract_unit_power(unit: &Value) -> i64 {
-    extract_authoritative_unit_power(unit).max(
-        extract_i64_from_paths(unit, &[&["currentPower"]]).unwrap_or(0),
-    )
+    extract_authoritative_unit_power(unit)
+        .max(extract_i64_from_paths(unit, &[&["currentPower"]]).unwrap_or(0))
 }
 
 fn normalize_ally_code_input(value: &str) -> String {
@@ -3562,16 +3641,36 @@ fn normalize_scan_key(value: &str) -> String {
 }
 
 fn canonical_defid(value: &str) -> String {
-    value.split(':').next().unwrap_or_default().trim().to_string()
+    value
+        .split(':')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_string()
 }
 
 fn canonical_defid_key(value: &str) -> String {
     canonical_defid(value).to_uppercase().replace('_', "")
 }
 
+fn canonical_ops_defid(value: &str) -> String {
+    match canonical_defid_key(value).as_str() {
+        "NEGOTIATOR" => String::from("CAPITALNEGOTIATOR"),
+        "DARTHMAUL" => String::from("MAUL"),
+        "REYSCAVENGER" | "SCAVENGERREY" => String::from("REY"),
+        _ => normalize_loc_key(&canonical_defid(value)),
+    }
+}
+
+fn ops_defids_match(left: &str, right: &str) -> bool {
+    let left_key = canonical_defid_key(&canonical_ops_defid(left));
+    let right_key = canonical_defid_key(&canonical_ops_defid(right));
+    !left_key.is_empty() && left_key == right_key
+}
+
 fn infer_combat_type(runtime: &BackendRuntime, def_id: &str, raw_ctype: Option<&Value>) -> i64 {
     let legacy = legacy_unit_data();
-    let key = canonical_defid_key(def_id);
+    let key = canonical_defid_key(&canonical_ops_defid(def_id));
     if runtime.known_ship_defids.contains(&key) || legacy.ship_defid_keys.contains(&key) {
         return 2;
     }
@@ -3675,7 +3774,11 @@ fn first_non_empty_string(value: &Value, paths: &[&str]) -> Option<String> {
             cursor = next;
         }
         if found {
-            if let Some(text) = cursor.as_str().map(str::trim).filter(|text| !text.is_empty()) {
+            if let Some(text) = cursor
+                .as_str()
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+            {
                 return Some(text.to_string());
             }
         }
@@ -3699,7 +3802,11 @@ fn extract_first_string(value: &Value, paths: &[&[&str]]) -> Option<String> {
             cursor = next;
         }
         if found {
-            if let Some(text) = cursor.as_str().map(str::trim).filter(|text| !text.is_empty()) {
+            if let Some(text) = cursor
+                .as_str()
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+            {
                 return Some(text.to_string());
             }
         }
@@ -3709,7 +3816,9 @@ fn extract_first_string(value: &Value, paths: &[&[&str]]) -> Option<String> {
 
 fn extract_i64(value: Option<&Value>) -> Option<i64> {
     match value? {
-        Value::Number(number) => number.as_i64().or_else(|| number.as_f64().map(|value| value as i64)),
+        Value::Number(number) => number
+            .as_i64()
+            .or_else(|| number.as_f64().map(|value| value as i64)),
         Value::String(text) => text
             .replace(',', "")
             .trim()
@@ -3758,5 +3867,76 @@ fn truthy(value: Option<&Value>) -> bool {
             lower == "true" || lower == "1"
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolves_ops_aliases_to_comlink_defids() {
+        let runtime = BackendRuntime::default();
+
+        assert_eq!(
+            resolve_unit_name_to_defid(&runtime, "Rey").as_deref(),
+            Some("REY")
+        );
+        assert_eq!(
+            resolve_unit_name_to_defid(&runtime, "Rey (Scavenger)").as_deref(),
+            Some("REY")
+        );
+        assert_eq!(
+            resolve_unit_name_to_defid(&runtime, "Darth Maul").as_deref(),
+            Some("MAUL")
+        );
+        assert_eq!(
+            resolve_unit_name_to_defid(&runtime, "Negotiator").as_deref(),
+            Some("CAPITALNEGOTIATOR")
+        );
+        assert_eq!(
+            resolve_unit_name_to_defid(&runtime, "NEGOTIATOR").as_deref(),
+            Some("CAPITALNEGOTIATOR")
+        );
+    }
+
+    #[test]
+    fn ops_defids_match_alias_and_comlink_forms() {
+        assert!(ops_defids_match("NEGOTIATOR", "CAPITALNEGOTIATOR"));
+        assert!(ops_defids_match("DARTHMAUL", "MAUL"));
+        assert!(ops_defids_match("REYSCAVENGER", "REY"));
+    }
+
+    #[test]
+    fn persists_bonus_unlock_checkbox_state() {
+        let sanitized = sanitize_persisted_app_state(json!({
+            "plannerSettings": {
+                "planetState": {
+                    "tatooine": {
+                        "smReady": true,
+                        "smCount": 1,
+                        "missionOverrides": {}
+                    },
+                    "bracca": {
+                        "smReady": false,
+                        "smCount": 0,
+                        "missionOverrides": {}
+                    }
+                }
+            }
+        }));
+
+        assert_eq!(
+            sanitized["plannerSettings"]["planetState"]["tatooine"]["smReady"],
+            Value::Bool(true)
+        );
+        assert_eq!(
+            sanitized["plannerSettings"]["planetState"]["tatooine"]["smCount"],
+            json!(1)
+        );
+        assert_eq!(
+            sanitized["plannerSettings"]["planetState"]["bracca"]["smReady"],
+            Value::Bool(false)
+        );
     }
 }

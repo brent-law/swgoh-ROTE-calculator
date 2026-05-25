@@ -1,14 +1,13 @@
 use crate::models::{
     GuildRosters, OpsDefinitions, PlannerAlgorithmMeta, PlannerAlgorithmScore,
-    PlannerBonusPlanetDayResult, PlannerChainDayResult, PlannerCompletedPlatoon,
-    PlannerDayResult, PlannerMissionDefinition, PlannerMissionEstimate,
-    PlannerMissionOverrideState, PlannerOptimizationProgressEvent,
-    PlannerOptimizationResponse, PlannerOpsAssignmentEntry, PlannerOpsAssignmentGroup,
-    PlannerOpsDaySummary, PlannerOpsPlanetDaySummary, PlannerOpsPlanetStats,
-    PlannerOpsSummary, PlannerPlanetCard, PlannerPlanetCardMap, PlannerPlanetDefinition,
-    PlannerPlanetHoldConfig, PlannerPlanetState, PlannerProjectionResponse,
-    PlannerReferenceResponse, PlannerSettings, PlannerSummary, PlatoonAnalysisMap,
-    PlatoonRequirement,
+    PlannerBonusPlanetDayResult, PlannerChainDayResult, PlannerCompletedPlatoon, PlannerDayResult,
+    PlannerMissionDefinition, PlannerMissionEstimate, PlannerMissionOverrideState,
+    PlannerOpsAssignmentEntry, PlannerOpsAssignmentGroup, PlannerOpsDaySummary,
+    PlannerOpsPlanetDaySummary, PlannerOpsPlanetStats, PlannerOpsSummary,
+    PlannerOptimizationProgressEvent, PlannerOptimizationResponse, PlannerPlanetCard,
+    PlannerPlanetCardMap, PlannerPlanetDefinition, PlannerPlanetHoldConfig, PlannerPlanetState,
+    PlannerProjectionResponse, PlannerReferenceResponse, PlannerSettings, PlannerSummary,
+    PlatoonAnalysisMap, PlatoonRequirement,
 };
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
@@ -387,7 +386,10 @@ pub fn build_projection(
         } else {
             format!(
                 "{} pts needed for {}",
-                format_number((next_star_threshold(planet, stars).unwrap_or(planet.stars[2]) - total_points).max(0)),
+                format_number(
+                    (next_star_threshold(planet, stars).unwrap_or(planet.stars[2]) - total_points)
+                        .max(0)
+                ),
                 if is_bonus_planet(planet) {
                     "full completion"
                 } else {
@@ -396,7 +398,10 @@ pub fn build_projection(
             )
         };
         let operations_note = if planet_ops_total > 0 {
-            format!("{} / {} platoons fillable", planet_ops_filled, planet_ops_total)
+            format!(
+                "{} / {} platoons fillable",
+                planet_ops_filled, planet_ops_total
+            )
         } else if analysis.is_some() {
             String::from("No platoon definitions for this planet.")
         } else {
@@ -623,7 +628,10 @@ fn run_algorithms_serial(
             });
         };
 
-        report_algorithm_progress(0.0, best_result.as_ref().map(|result| result.stars).unwrap_or(0));
+        report_algorithm_progress(
+            0.0,
+            best_result.as_ref().map(|result| result.stars).unwrap_or(0),
+        );
         let result = engine.run_algorithm(key, &mut report_algorithm_progress);
         scores.push(score_entry(key, result.stars));
         if best_result
@@ -684,7 +692,10 @@ fn run_all_algorithms_parallel(
         let engine_for_worker = engine.clone();
         let pool_threads = base_pool_threads + usize::from(worker_idx < extra_pool_threads);
         workers.push(std::thread::spawn(move || {
-            let pool = ThreadPoolBuilder::new().num_threads(pool_threads.max(1)).build().ok();
+            let pool = ThreadPoolBuilder::new()
+                .num_threads(pool_threads.max(1))
+                .build()
+                .ok();
             loop {
                 let algorithm = {
                     let mut work_queue = queue.lock().unwrap();
@@ -858,8 +869,13 @@ impl PlannerEngine {
             .filter(|planet| planet.chain == "ls")
             .map(|planet| planet.id.clone())
             .collect::<Vec<_>>();
-        let hold_constraint =
-            build_hold_constraint(&settings.planet_hold, &planet_map, &ds_chain, &mx_chain, &ls_chain);
+        let hold_constraint = build_hold_constraint(
+            &settings.planet_hold,
+            &planet_map,
+            &ds_chain,
+            &mx_chain,
+            &ls_chain,
+        );
         let (_ops_defs, ops_model) = build_precomputed_ops_model(rosters, ops_defs, &planet_map);
 
         Self {
@@ -899,12 +915,7 @@ impl PlannerEngine {
             .collect()
     }
 
-    fn hold_requires_commit_today(
-        &self,
-        chain_key: &str,
-        current_idx: usize,
-        day: i64,
-    ) -> bool {
+    fn hold_requires_commit_today(&self, chain_key: &str, current_idx: usize, day: i64) -> bool {
         let Some(hold) = &self.hold_constraint else {
             return false;
         };
@@ -932,11 +943,7 @@ impl PlannerEngine {
         commits_needed >= available_days
     }
 
-    fn hold_planet_is_active_on_chain(
-        &self,
-        chain_key: &str,
-        current_idx: usize,
-    ) -> bool {
+    fn hold_planet_is_active_on_chain(&self, chain_key: &str, current_idx: usize) -> bool {
         let Some(hold) = &self.hold_constraint else {
             return false;
         };
@@ -1020,7 +1027,13 @@ impl PlannerEngine {
                 let mut child = parent_a
                     .iter()
                     .enumerate()
-                    .map(|(idx, gene)| if rng.next_bool() { *gene } else { parent_b[idx] })
+                    .map(|(idx, gene)| {
+                        if rng.next_bool() {
+                            *gene
+                        } else {
+                            parent_b[idx]
+                        }
+                    })
                     .collect::<Vec<_>>();
 
                 for gene in &mut child {
@@ -1137,7 +1150,14 @@ impl PlannerEngine {
 
         let initial_genomes = particles
             .iter()
-            .map(|particle| particle.0.iter().copied().map(clamp_gene).collect::<Vec<_>>())
+            .map(|particle| {
+                particle
+                    .0
+                    .iter()
+                    .copied()
+                    .map(clamp_gene)
+                    .collect::<Vec<_>>()
+            })
             .collect::<Vec<_>>();
         let initial_scores = self.score_genomes_parallel(&initial_genomes);
         for (particle, evaluation) in particles.iter_mut().zip(initial_scores.into_iter()) {
@@ -1166,7 +1186,14 @@ impl PlannerEngine {
             }
             let genomes = particles
                 .iter()
-                .map(|particle| particle.0.iter().copied().map(clamp_gene).collect::<Vec<_>>())
+                .map(|particle| {
+                    particle
+                        .0
+                        .iter()
+                        .copied()
+                        .map(clamp_gene)
+                        .collect::<Vec<_>>()
+                })
                 .collect::<Vec<_>>();
             let scores = self.score_genomes_parallel(&genomes);
             for (particle, evaluation) in particles.iter_mut().zip(scores.into_iter()) {
@@ -1212,12 +1239,7 @@ impl PlannerEngine {
                         .map(|_| rng.next_f64() * 3.0)
                         .collect::<Vec<_>>()
                 };
-                (
-                    pos,
-                    vec![0.0; OPT_GENES],
-                    vec![0.0; OPT_GENES],
-                    0usize,
-                )
+                (pos, vec![0.0; OPT_GENES], vec![0.0; OPT_GENES], 0usize)
             })
             .collect::<Vec<_>>();
 
@@ -1295,8 +1317,8 @@ impl PlannerEngine {
                     let m_hat = agent.1[idx] / (1.0 - b1.powf(t));
                     let v_hat = agent.2[idx] / (1.0 - b2.powf(t));
                     let pull = (best.genome[idx] as f64 - current[idx] as f64) * 0.05;
-                    agent.0[idx] = (agent.0[idx] + lr * m_hat / (v_hat.sqrt() + eps) + pull)
-                        .clamp(0.0, 3.0);
+                    agent.0[idx] =
+                        (agent.0[idx] + lr * m_hat / (v_hat.sqrt() + eps) + pull).clamp(0.0, 3.0);
                 }
             }
         }
@@ -1308,7 +1330,11 @@ impl PlannerEngine {
     fn greedy_genome(&self) -> Vec<i64> {
         let mut genome = vec![1; OPT_GENES];
         for day in 0..6usize {
-            let options = if day == 5 { [1, 2, 3, -1] } else { [0, 1, 2, 3] };
+            let options = if day == 5 {
+                [1, 2, 3, -1]
+            } else {
+                [0, 1, 2, 3]
+            };
             let mut combos = Vec::<[i64; 3]>::new();
             let mut candidates = Vec::<Vec<i64>>::new();
             for ds in options.into_iter().filter(|value| *value >= 0) {
@@ -1367,17 +1393,27 @@ impl PlannerEngine {
         score -= simulated.bonus_missing_completions * BONUS_COMPLETION_MISSING_PENALTY;
         score -= simulated.bonus_partial_closures * BONUS_PARTIAL_CLOSE_PENALTY;
 
-        score + overflow_opportunity_bonus(
-            simulated.best_extra_star_gap,
-            simulated.total_extra_star_gap,
-        )
+        score
+            + overflow_opportunity_bonus(
+                simulated.best_extra_star_gap,
+                simulated.total_extra_star_gap,
+            )
     }
 
     fn simulate_genome_plan(&self, genome: &[i64], detailed: bool) -> SimulatedPlan {
         let mut state = HashMap::<String, PlanetProgressState>::new();
-        state.insert(String::from("ds"), PlanetProgressState { idx: 0, banked: 0 });
-        state.insert(String::from("mx"), PlanetProgressState { idx: 0, banked: 0 });
-        state.insert(String::from("ls"), PlanetProgressState { idx: 0, banked: 0 });
+        state.insert(
+            String::from("ds"),
+            PlanetProgressState { idx: 0, banked: 0 },
+        );
+        state.insert(
+            String::from("mx"),
+            PlanetProgressState { idx: 0, banked: 0 },
+        );
+        state.insert(
+            String::from("ls"),
+            PlanetProgressState { idx: 0, banked: 0 },
+        );
         let mut bonus_state = create_bonus_activation_state(&self.settings, &self.planet_map);
         let mut ops_state = self.create_operations_sim_state(detailed);
         let mut days = if detailed {
@@ -1406,10 +1442,13 @@ impl PlannerEngine {
                 ("mx", &self.mx_chain),
                 ("ls", &self.ls_chain),
             ] {
-                let progress = state.get(chain_key).cloned().unwrap_or(PlanetProgressState {
-                    idx: chain_ids.len(),
-                    banked: 0,
-                });
+                let progress = state
+                    .get(chain_key)
+                    .cloned()
+                    .unwrap_or(PlanetProgressState {
+                        idx: chain_ids.len(),
+                        banked: 0,
+                    });
                 if progress.idx >= chain_ids.len() {
                     continue;
                 }
@@ -1460,8 +1499,12 @@ impl PlannerEngine {
                 });
             }
 
-            let day_ops =
-                self.allocate_operations_for_day(day, &preview_priorities, &mut ops_state, detailed);
+            let day_ops = self.allocate_operations_for_day(
+                day,
+                &preview_priorities,
+                &mut ops_state,
+                detailed,
+            );
             let mut ops_points_by_planet = HashMap::<String, i64>::new();
             for (pid, planet) in &day_ops.planets {
                 if planet.points_earned > 0 {
@@ -1500,8 +1543,9 @@ impl PlannerEngine {
                     continue;
                 };
                 let banked = state.get(chain_key).map(|entry| entry.banked).unwrap_or(0);
-                let base =
-                    banked + self.mission_only_points(&planet.id) + *ops_points_by_planet.get(&planet.id).unwrap_or(&0);
+                let base = banked
+                    + self.mission_only_points(&planet.id)
+                    + *ops_points_by_planet.get(&planet.id).unwrap_or(&0);
                 let gene = *targets.get(chain_key).unwrap_or(&-1);
                 bases.insert(chain_key.to_string(), base);
                 gp_need.insert(
@@ -1515,16 +1559,14 @@ impl PlannerEngine {
             }
 
             let total_need = gp_need.values().sum::<i64>();
-            let mandatory_chain = ["ds", "mx", "ls"]
-                .iter()
-                .find_map(|chain_key| {
-                    let progress = state.get(*chain_key)?;
-                    if self.hold_requires_commit_today(chain_key, progress.idx, day) {
-                        Some((*chain_key).to_string())
-                    } else {
-                        None
-                    }
-                });
+            let mandatory_chain = ["ds", "mx", "ls"].iter().find_map(|chain_key| {
+                let progress = state.get(*chain_key)?;
+                if self.hold_requires_commit_today(chain_key, progress.idx, day) {
+                    Some((*chain_key).to_string())
+                } else {
+                    None
+                }
+            });
             let mandatory_need = mandatory_chain
                 .as_ref()
                 .and_then(|chain_key| gp_need.get(chain_key))
@@ -1537,7 +1579,7 @@ impl PlannerEngine {
                     .and_then(|chain_key| gp_need.get(chain_key))
                     .copied()
                     .unwrap_or(0))
-                .max(0);
+            .max(0);
             let discretionary_gp = (gp_day - mandatory_need).max(0);
             let ratio = if discretionary_need > discretionary_gp {
                 discretionary_gp as f64 / discretionary_need as f64
@@ -1616,7 +1658,8 @@ impl PlannerEngine {
                             chain_key.to_string(),
                             PlannerChainDayResult {
                                 key: chain_key.to_string(),
-                                status: if day == 6 && !hold_requires_open_today && safe_banked == 0 {
+                                status: if day == 6 && !hold_requires_open_today && safe_banked == 0
+                                {
                                     String::from("building")
                                 } else {
                                     String::from("preload")
@@ -1625,7 +1668,11 @@ impl PlannerEngine {
                                 planet_name: Some(planet.name.clone()),
                                 align: Some(planet.align.clone()),
                                 banked: safe_banked,
-                                tomorrow_est: if day < 6 { safe_banked + mission_pts } else { 0 },
+                                tomorrow_est: if day < 6 {
+                                    safe_banked + mission_pts
+                                } else {
+                                    0
+                                },
                                 threshold1star: planet.stars[0],
                                 carry_in_pts,
                                 mission_pts,
@@ -1857,7 +1904,11 @@ impl PlannerEngine {
             .map(|day| PlannerOpsDaySummary {
                 day: day.day,
                 points_earned: day.ops_points,
-                slots_filled: day.ops_planets.values().map(|planet| planet.slots_filled).sum(),
+                slots_filled: day
+                    .ops_planets
+                    .values()
+                    .map(|planet| planet.slots_filled)
+                    .sum(),
                 completed_platoons: day.ops_completed.clone(),
                 planets: day.ops_planets.clone(),
             })
@@ -1979,7 +2030,13 @@ impl PlannerEngine {
                 .map(|mission| {
                     project_fleet_points(
                         mission,
-                        mission_expected_completions(&self.settings, planet, &state, mission, false),
+                        mission_expected_completions(
+                            &self.settings,
+                            planet,
+                            &state,
+                            mission,
+                            false,
+                        ),
                     )
                 })
                 .sum()
@@ -2046,8 +2103,16 @@ impl PlannerEngine {
             };
 
             loop {
-                let mut fillable =
-                    Vec::<(usize, Vec<PlannedOpsAssignment>, i64, i64, usize, usize, usize, usize)>::new();
+                let mut fillable = Vec::<(
+                    usize,
+                    Vec<PlannedOpsAssignment>,
+                    i64,
+                    i64,
+                    usize,
+                    usize,
+                    usize,
+                    usize,
+                )>::new();
                 for (platoon_idx, platoon) in planet_model.platoons.iter().enumerate() {
                     let platoon_state = &planet_state.platoons[platoon_idx];
                     if platoon_state.completed {
@@ -2061,7 +2126,11 @@ impl PlannerEngine {
                     ) else {
                         continue;
                     };
-                    let filled_now = platoon_state.filled.iter().filter(|filled| **filled).count() as i64;
+                    let filled_now = platoon_state
+                        .filled
+                        .iter()
+                        .filter(|filled| **filled)
+                        .count() as i64;
                     let remaining = platoon.slot_templates.len() as i64 - filled_now;
                     fillable.push((
                         platoon_idx,
@@ -2119,10 +2188,16 @@ impl PlannerEngine {
                 .enumerate()
                 .filter_map(|(platoon_idx, platoon)| {
                     let platoon_state = &planet_state.platoons[platoon_idx];
-                    if platoon_state.completed || !self.can_eventually_complete_platoon(platoon, platoon_state) {
+                    if platoon_state.completed
+                        || !self.can_eventually_complete_platoon(platoon, platoon_state)
+                    {
                         return None;
                     }
-                    let filled_now = platoon_state.filled.iter().filter(|filled| **filled).count() as i64;
+                    let filled_now = platoon_state
+                        .filled
+                        .iter()
+                        .filter(|filled| **filled)
+                        .count() as i64;
                     Some((
                         platoon_idx,
                         filled_now,
@@ -2197,7 +2272,9 @@ impl PlannerEngine {
                 continue;
             }
             let planet_state = ops_state.planets.get(pid);
-            let completed_platoons = planet_state.map(|state| state.completed_platoons).unwrap_or(0);
+            let completed_platoons = planet_state
+                .map(|state| state.completed_platoons)
+                .unwrap_or(0);
             let total_slots = planet
                 .platoons
                 .iter()
@@ -2208,7 +2285,9 @@ impl PlannerEngine {
                     state
                         .platoons
                         .iter()
-                        .map(|platoon| platoon.filled.iter().filter(|filled| **filled).count() as i64)
+                        .map(|platoon| {
+                            platoon.filled.iter().filter(|filled| **filled).count() as i64
+                        })
                         .sum::<i64>()
                 })
                 .unwrap_or(0);
@@ -2260,7 +2339,8 @@ impl PlannerEngine {
                 if remaining_slots.is_empty() {
                     return None;
                 }
-                let available = self.count_assignable_ops_candidates(requirement, &temp_assigned, &temp_usage);
+                let available =
+                    self.count_assignable_ops_candidates(requirement, &temp_assigned, &temp_usage);
                 Some((idx, remaining_slots, available))
             })
             .collect::<Vec<_>>();
@@ -2275,7 +2355,9 @@ impl PlannerEngine {
                 .then_with(|| {
                     let left_req = &platoon.grouped_requirements[left.0];
                     let right_req = &platoon.grouped_requirements[right.0];
-                    left_req.unique_owner_count.cmp(&right_req.unique_owner_count)
+                    left_req
+                        .unique_owner_count
+                        .cmp(&right_req.unique_owner_count)
                 })
                 .then_with(|| {
                     let left_req = &platoon.grouped_requirements[left.0];
@@ -2335,7 +2417,8 @@ impl PlannerEngine {
                 if remaining_slots.is_empty() {
                     return None;
                 }
-                let available = self.count_assignable_ops_candidates(requirement, assigned_units, planet_usage);
+                let available =
+                    self.count_assignable_ops_candidates(requirement, assigned_units, planet_usage);
                 Some((idx, remaining_slots, available))
             })
             .collect::<Vec<_>>();
@@ -2350,7 +2433,9 @@ impl PlannerEngine {
                 .then_with(|| {
                     let left_req = &platoon.grouped_requirements[left.0];
                     let right_req = &platoon.grouped_requirements[right.0];
-                    left_req.unique_owner_count.cmp(&right_req.unique_owner_count)
+                    left_req
+                        .unique_owner_count
+                        .cmp(&right_req.unique_owner_count)
                 })
                 .then_with(|| {
                     let left_req = &platoon.grouped_requirements[left.0];
@@ -2381,7 +2466,8 @@ impl PlannerEngine {
                         unit_key: candidate.unit_key.clone(),
                         day,
                     });
-                    assignments.push(self.build_ops_assignment_entry(platoon, req_idx, chosen, day));
+                    assignments
+                        .push(self.build_ops_assignment_entry(platoon, req_idx, chosen, day));
                 }
                 slots_filled += 1;
             }
@@ -2441,9 +2527,12 @@ impl PlannerEngine {
                         unit_key: candidate.unit_key.clone(),
                         day,
                     });
-                    output_assignments.push(
-                        self.build_ops_assignment_entry(platoon, idx, assignment.candidate_id, day),
-                    );
+                    output_assignments.push(self.build_ops_assignment_entry(
+                        platoon,
+                        idx,
+                        assignment.candidate_id,
+                        day,
+                    ));
                 }
             }
             slots_filled += 1;
@@ -2492,7 +2581,9 @@ impl PlannerEngine {
             .candidate_ids
             .iter()
             .copied()
-            .filter(|candidate_id| self.candidate_is_assignable(*candidate_id, assigned_units, planet_usage))
+            .filter(|candidate_id| {
+                self.candidate_is_assignable(*candidate_id, assigned_units, planet_usage)
+            })
             .count()
     }
 
@@ -2548,11 +2639,13 @@ impl PlannerEngine {
             planet_summary.completed_today += 1;
             planet_summary.points_earned += applied.points_earned;
             day_summary.points_earned += applied.points_earned;
-            day_summary.completed_platoons.push(PlannerCompletedPlatoon {
-                pid: pid.to_string(),
-                platoon_idx: platoon_idx as i64,
-                points: applied.points_earned,
-            });
+            day_summary
+                .completed_platoons
+                .push(PlannerCompletedPlatoon {
+                    pid: pid.to_string(),
+                    platoon_idx: platoon_idx as i64,
+                    points: applied.points_earned,
+                });
         }
     }
 
@@ -2655,7 +2748,10 @@ fn build_precomputed_ops_model(
     };
 
     for (pid, platoons) in ops_defs {
-        let reward_points = planet_map.get(&pid).map(|planet| planet.ops_val).unwrap_or(0);
+        let reward_points = planet_map
+            .get(&pid)
+            .map(|planet| planet.ops_val)
+            .unwrap_or(0);
         let mut filtered_planet = Vec::<Vec<PlatoonRequirement>>::new();
         let mut precomputed_planet = PrecomputedOpsPlanet {
             reward_points,
@@ -2670,13 +2766,15 @@ fn build_precomputed_ops_model(
             for (slot_idx, requirement) in slot_templates.iter().enumerate() {
                 let group_key = format!(
                     "{}|{}|{}|{}",
-                    canonical_defid(&requirement.def_id),
+                    canonical_ops_defid(&requirement.def_id),
                     normalize_ops_name(&requirement.name),
                     requirement.min_rarity,
                     requirement.min_relic
                 );
                 if let Some(existing_idx) = grouped_keys.get(&group_key).copied() {
-                    grouped_requirements[existing_idx].slot_indices.push(slot_idx);
+                    grouped_requirements[existing_idx]
+                        .slot_indices
+                        .push(slot_idx);
                     continue;
                 }
 
@@ -2727,15 +2825,19 @@ fn build_precomputed_ops_model(
             let mut next_conflict_id = 0usize;
             for (req_idx, requirement) in grouped_requirements.iter_mut().enumerate() {
                 let signature = &owner_signatures[req_idx];
-                if !signature.is_empty() && signature_counts.get(signature).copied().unwrap_or(0) > 1 {
-                    let conflict_id = *signature_ids.entry(signature.clone()).or_insert_with(|| {
-                        let current = next_conflict_id;
-                        next_conflict_id += 1;
-                        current
-                    });
+                if !signature.is_empty()
+                    && signature_counts.get(signature).copied().unwrap_or(0) > 1
+                {
+                    let conflict_id =
+                        *signature_ids.entry(signature.clone()).or_insert_with(|| {
+                            let current = next_conflict_id;
+                            next_conflict_id += 1;
+                            current
+                        });
                     requirement.conflict_group = Some(conflict_id);
                 }
-                requirement.scarce = requirement.candidate_ids.len() <= OPS_SCARCE_CANDIDATE_THRESHOLD
+                requirement.scarce = requirement.candidate_ids.len()
+                    <= OPS_SCARCE_CANDIDATE_THRESHOLD
                     || requirement.unique_owner_count <= OPS_SCARCE_CANDIDATE_THRESHOLD;
             }
 
@@ -2837,9 +2939,8 @@ fn overflow_opportunity_bonus(best_gap: Option<i64>, total_gap: i64) -> i64 {
     let best_component =
         (OVERFLOW_PRIMARY_MAX - (best_gap / 100_000).min(OVERFLOW_PRIMARY_MAX)).max(0);
     let secondary_gap = total_gap.saturating_sub(best_gap);
-    let secondary_component = (OVERFLOW_SECONDARY_MAX
-        - (secondary_gap / 1_000_000).min(OVERFLOW_SECONDARY_MAX))
-    .max(0);
+    let secondary_component =
+        (OVERFLOW_SECONDARY_MAX - (secondary_gap / 1_000_000).min(OVERFLOW_SECONDARY_MAX)).max(0);
 
     best_component + secondary_component
 }
@@ -2901,7 +3002,7 @@ fn build_ops_candidate_indexes(
             continue;
         };
         for unit in roster {
-            let def_id = canonical_defid(&unit.def_id);
+            let def_id = canonical_ops_defid(&unit.def_id);
             let normalized_name = normalize_ops_name(&unit.name);
             if def_id.is_empty() && normalized_name.is_empty() {
                 continue;
@@ -2922,10 +3023,15 @@ fn build_ops_candidate_indexes(
             let candidate_idx = candidates.len();
             candidates.push(candidate);
             if !def_id.is_empty() {
-                by_def.entry(def_id).or_default().push(candidate_idx);
+                for lookup_key in ops_defid_lookup_keys(&def_id) {
+                    by_def.entry(lookup_key).or_default().push(candidate_idx);
+                }
             }
             if !normalized_name.is_empty() {
-                by_name.entry(normalized_name).or_default().push(candidate_idx);
+                by_name
+                    .entry(normalized_name)
+                    .or_default()
+                    .push(candidate_idx);
             }
         }
     }
@@ -2964,13 +3070,28 @@ fn matching_ops_candidate_ids(
     by_name: &HashMap<String, Vec<usize>>,
     requirement: &PlatoonRequirement,
 ) -> Vec<usize> {
-    let def_id = canonical_defid(&requirement.def_id);
+    let def_id = canonical_ops_defid(&requirement.def_id);
     let normalized_name = normalize_ops_name(&requirement.name);
-    let mut matched = by_def
-        .get(&def_id)
-        .or_else(|| by_name.get(&normalized_name))
-        .cloned()
-        .unwrap_or_default()
+    let mut candidate_ids = Vec::<usize>::new();
+    let mut seen = HashSet::<usize>::new();
+    for lookup_key in ops_defid_lookup_keys(&def_id) {
+        if let Some(ids) = by_def.get(&lookup_key) {
+            for candidate_id in ids {
+                if seen.insert(*candidate_id) {
+                    candidate_ids.push(*candidate_id);
+                }
+            }
+        }
+    }
+    if let Some(ids) = by_name.get(&normalized_name) {
+        for candidate_id in ids {
+            if seen.insert(*candidate_id) {
+                candidate_ids.push(*candidate_id);
+            }
+        }
+    }
+
+    let mut matched = candidate_ids
         .into_iter()
         .filter(|candidate_id| {
             candidates
@@ -2992,7 +3113,10 @@ fn matching_ops_candidate_ids(
     matched
 }
 
-fn ops_owner_signature(requirement: &PrecomputedOpsRequirement, candidates: &[OpsCandidate]) -> String {
+fn ops_owner_signature(
+    requirement: &PrecomputedOpsRequirement,
+    candidates: &[OpsCandidate],
+) -> String {
     let mut owners = requirement
         .candidate_ids
         .iter()
@@ -3091,11 +3215,7 @@ fn active_member_count(settings: &PlannerSettings) -> i64 {
 }
 
 fn planet_state(settings: &PlannerSettings, pid: &str) -> PlannerPlanetState {
-    settings
-        .planet_state
-        .get(pid)
-        .cloned()
-        .unwrap_or_default()
+    settings.planet_state.get(pid).cloned().unwrap_or_default()
 }
 
 fn mission_override_state<'a>(
@@ -3152,8 +3272,9 @@ fn mission_expected_completions(
             .and_then(|entry| entry.rate_override)
             .map(|value| active_members * (value / 100.0).clamp(0.0, 1.0))
     };
-    let count_from_override =
-        |override_state: Option<&PlannerMissionOverrideState>| override_state.and_then(|entry| entry.count_override);
+    let count_from_override = |override_state: Option<&PlannerMissionOverrideState>| {
+        override_state.and_then(|entry| entry.count_override)
+    };
 
     let planet_count_override = if combat {
         state.cm_count_override
@@ -3175,14 +3296,18 @@ fn mission_expected_completions(
         return count_from_override(mission_override)
             .or_else(|| rate_from_override(mission_override))
             .or(planet_count_override)
-            .or_else(|| planet_rate_override.map(|value| active_members * (value / 100.0).clamp(0.0, 1.0)))
+            .or_else(|| {
+                planet_rate_override.map(|value| active_members * (value / 100.0).clamp(0.0, 1.0))
+            })
             .unwrap_or(active_members * default_rate)
             .max(0.0);
     }
 
     rate_from_override(mission_override)
         .or_else(|| count_from_override(mission_override))
-        .or_else(|| planet_rate_override.map(|value| active_members * (value / 100.0).clamp(0.0, 1.0)))
+        .or_else(|| {
+            planet_rate_override.map(|value| active_members * (value / 100.0).clamp(0.0, 1.0))
+        })
         .or(planet_count_override)
         .unwrap_or(active_members * default_rate)
         .max(0.0)
@@ -3316,7 +3441,9 @@ fn capability_badge(rosters: &GuildRosters, planet: &PlannerPlanetDefinition) ->
         .filter(|roster| {
             roster
                 .iter()
-                .filter(|unit| unit.combat_type == 1 && unit.rarity >= 7 && unit.relic >= planet.min_relic)
+                .filter(|unit| {
+                    unit.combat_type == 1 && unit.rarity >= 7 && unit.relic >= planet.min_relic
+                })
                 .count()
                 >= 5
         })
@@ -3331,7 +3458,10 @@ fn capability_badge(rosters: &GuildRosters, planet: &PlannerPlanetDefinition) ->
     CapabilityReport {
         can_cm,
         total,
-        label: format!("{can_cm}/{total} can do R{}+ CMs ({pct}%)", planet.min_relic),
+        label: format!(
+            "{can_cm}/{total} can do R{}+ CMs ({pct}%)",
+            planet.min_relic
+        ),
     }
 }
 
@@ -3488,6 +3618,32 @@ fn canonical_defid(value: &str) -> String {
         .unwrap_or_default()
         .trim()
         .to_uppercase()
+}
+
+fn canonical_ops_defid(value: &str) -> String {
+    match canonical_defid(value).replace('_', "").as_str() {
+        "NEGOTIATOR" => String::from("CAPITALNEGOTIATOR"),
+        "DARTHMAUL" => String::from("MAUL"),
+        "REYSCAVENGER" | "SCAVENGERREY" => String::from("REY"),
+        _ => canonical_defid(value),
+    }
+}
+
+fn ops_defid_lookup_keys(value: &str) -> Vec<String> {
+    let canonical = canonical_ops_defid(value);
+    let mut keys = vec![canonical.clone()];
+    match canonical.replace('_', "").as_str() {
+        "CAPITALNEGOTIATOR" => keys.push(String::from("NEGOTIATOR")),
+        "MAUL" => keys.push(String::from("DARTHMAUL")),
+        "REY" => {
+            keys.push(String::from("REYSCAVENGER"));
+            keys.push(String::from("SCAVENGERREY"));
+        }
+        _ => {}
+    }
+    keys.sort();
+    keys.dedup();
+    keys
 }
 
 fn normalize_ops_name(value: &str) -> String {
@@ -4414,12 +4570,7 @@ fn fleet(
     }
 }
 
-fn special(
-    id: &str,
-    label: &str,
-    units_text: &str,
-    reward_text: &str,
-) -> PlannerMissionDefinition {
+fn special(id: &str, label: &str, units_text: &str, reward_text: &str) -> PlannerMissionDefinition {
     PlannerMissionDefinition {
         id: id.to_string(),
         label: label.to_string(),
@@ -4450,5 +4601,75 @@ fn special_unlock(
         units_text: units_text.to_string(),
         note: None,
         unlocks: Some(unlocks.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::SimplifiedRosterUnit;
+
+    #[test]
+    fn ops_candidate_matching_handles_known_unit_aliases() {
+        let mut rosters = GuildRosters::new();
+        rosters.insert(
+            String::from("123456789"),
+            vec![
+                SimplifiedRosterUnit {
+                    def_id: String::from("REY"),
+                    name: String::from("Rey (Scavenger)"),
+                    rarity: 7,
+                    relic: 5,
+                    ..Default::default()
+                },
+                SimplifiedRosterUnit {
+                    def_id: String::from("MAUL"),
+                    name: String::from("Darth Maul"),
+                    rarity: 7,
+                    relic: 5,
+                    ..Default::default()
+                },
+                SimplifiedRosterUnit {
+                    def_id: String::from("CAPITALNEGOTIATOR"),
+                    name: String::from("Negotiator"),
+                    rarity: 7,
+                    combat_type: 2,
+                    ..Default::default()
+                },
+            ],
+        );
+
+        let (candidates, by_def, by_name, _) = build_ops_candidate_indexes(&rosters);
+        let rey = PlatoonRequirement {
+            def_id: String::from("REYSCAVENGER"),
+            name: String::from("Rey (Scavenger)"),
+            min_rarity: 7,
+            min_relic: 5,
+        };
+        let maul = PlatoonRequirement {
+            def_id: String::from("DARTHMAUL"),
+            name: String::from("Darth Maul"),
+            min_rarity: 7,
+            min_relic: 5,
+        };
+        let negotiator = PlatoonRequirement {
+            def_id: String::from("NEGOTIATOR"),
+            name: String::from("Negotiator"),
+            min_rarity: 7,
+            min_relic: 0,
+        };
+
+        assert_eq!(
+            matching_ops_candidate_ids(&candidates, &by_def, &by_name, &rey).len(),
+            1
+        );
+        assert_eq!(
+            matching_ops_candidate_ids(&candidates, &by_def, &by_name, &maul).len(),
+            1
+        );
+        assert_eq!(
+            matching_ops_candidate_ids(&candidates, &by_def, &by_name, &negotiator).len(),
+            1
+        );
     }
 }

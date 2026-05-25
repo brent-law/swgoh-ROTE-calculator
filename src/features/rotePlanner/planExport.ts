@@ -356,16 +356,12 @@ function getDayExportEstimateSummary(
     fleetIds.map((planetId) => effectivePlanetRate(plannerSettings, planetId, "fleet")),
   );
   const undeployedGp = getUndeployedGpForDay(plannerSettings, dayPlan.day);
-  const overallParticipationPct = averageNumber([
-    cmAvgPct,
-    fleetAvgPct,
-    100 - getUndeployedPctForDay(plannerSettings, dayPlan.day),
-  ]);
+  const gpParticipationPct = 100 - getUndeployedPctForDay(plannerSettings, dayPlan.day);
   return {
     cmAvgPct,
     fleetAvgPct,
     undeployedGp,
-    overallParticipationPct,
+    gpParticipationPct,
   };
 }
 
@@ -383,7 +379,7 @@ function buildDayExportEstimateLine(
     opsDefinitions,
     planetOrder,
   );
-  return `Estimated participation: ${formatExportPercent(summary.overallParticipationPct)} overall | Avg CM ${formatExportPercent(summary.cmAvgPct)} | Avg Fleet ${formatExportPercent(summary.fleetAvgPct)} | Undeployed GP ${formatMillions(summary.undeployedGp)}`;
+  return `Estimated GP participation: ${formatExportPercent(summary.gpParticipationPct)} | Avg CM ${formatExportPercent(summary.cmAvgPct)} | Avg Fleet ${formatExportPercent(summary.fleetAvgPct)} | Undeployed GP ${formatMillions(summary.undeployedGp)}`;
 }
 
 function buildProjectedPointsBreakdownHtml(

@@ -829,6 +829,8 @@ function toPersistedPlanetPlannerState(
     fleetRateOverride: planetState.fleetRateOverride,
     cmCountOverride: planetState.cmCountOverride,
     fleetCountOverride: planetState.fleetCountOverride,
+    smReady: planetState.smReady,
+    smCount: planetState.smCount,
     missionOverrides: Object.fromEntries(
       Object.entries(planetState.missionOverrides).map(([missionId, missionState]) => [
         missionId,

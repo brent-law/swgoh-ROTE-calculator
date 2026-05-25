@@ -157,6 +157,8 @@ export type PersistedPlannerPlanetState = {
   fleetRateOverride: number | null;
   cmCountOverride: number | null;
   fleetCountOverride: number | null;
+  smReady: boolean;
+  smCount: number;
   missionOverrides: Record<string, PersistedPlannerMissionOverrideState>;
 };
 

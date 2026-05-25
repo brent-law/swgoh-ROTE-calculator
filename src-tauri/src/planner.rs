@@ -3214,6 +3214,37 @@ fn active_member_count(settings: &PlannerSettings) -> i64 {
     settings.guild_members.clamp(1, 50)
 }
 
+fn active_member_count_f64(settings: &PlannerSettings) -> f64 {
+    active_member_count(settings) as f64
+}
+
+fn clamp_completion_count(settings: &PlannerSettings, value: f64) -> f64 {
+    value.clamp(0.0, active_member_count_f64(settings))
+}
+
+fn completion_count_to_rate(settings: &PlannerSettings, value: f64) -> f64 {
+    let active_members = active_member_count_f64(settings);
+    if active_members <= 0.0 {
+        0.0
+    } else {
+        (clamp_completion_count(settings, value) / active_members).clamp(0.0, 1.0)
+    }
+}
+
+fn default_completion_count(
+    settings: &PlannerSettings,
+    planet: &PlannerPlanetDefinition,
+    combat: bool,
+) -> f64 {
+    let depth = chain_depth(&planet.id) as f64;
+    let raw_count = if combat {
+        settings.cm_base - settings.cm_falloff * depth
+    } else {
+        settings.fleet_base - settings.fleet_falloff * depth
+    };
+    clamp_completion_count(settings, raw_count)
+}
+
 fn planet_state(settings: &PlannerSettings, pid: &str) -> PlannerPlanetState {
     settings.planet_state.get(pid).cloned().unwrap_or_default()
 }
@@ -3228,11 +3259,10 @@ fn mission_override_state<'a>(
 fn effective_cm_rate(settings: &PlannerSettings, planet: &PlannerPlanetDefinition) -> f64 {
     let state = planet_state(settings, &planet.id);
     if settings.cm_mode == "count" {
-        if let Some(override_count) = state.cm_count_override {
-            return (override_count / active_member_count(settings) as f64).clamp(0.0, 1.0);
-        }
-        return ((settings.cm_base - settings.cm_falloff * chain_depth(&planet.id) as f64) / 100.0)
-            .clamp(0.0, 1.0);
+        let count = state
+            .cm_count_override
+            .unwrap_or_else(|| default_completion_count(settings, planet, true));
+        return completion_count_to_rate(settings, count);
     }
     if let Some(override_rate) = state.cm_rate_override {
         return (override_rate / 100.0).clamp(0.0, 1.0);
@@ -3244,12 +3274,10 @@ fn effective_cm_rate(settings: &PlannerSettings, planet: &PlannerPlanetDefinitio
 fn effective_fleet_rate(settings: &PlannerSettings, planet: &PlannerPlanetDefinition) -> f64 {
     let state = planet_state(settings, &planet.id);
     if settings.cm_mode == "count" {
-        if let Some(override_count) = state.fleet_count_override {
-            return (override_count / active_member_count(settings) as f64).clamp(0.0, 1.0);
-        }
-        return ((settings.fleet_base - settings.fleet_falloff * chain_depth(&planet.id) as f64)
-            / 100.0)
-            .clamp(0.0, 1.0);
+        let count = state
+            .fleet_count_override
+            .unwrap_or_else(|| default_completion_count(settings, planet, false));
+        return completion_count_to_rate(settings, count);
     }
     if let Some(override_rate) = state.fleet_rate_override {
         return (override_rate / 100.0).clamp(0.0, 1.0);
@@ -3265,22 +3293,27 @@ fn mission_expected_completions(
     mission: &PlannerMissionDefinition,
     combat: bool,
 ) -> f64 {
-    let active_members = active_member_count(settings) as f64;
+    let active_members = active_member_count_f64(settings);
     let mission_override = mission_override_state(state, &mission.id);
     let rate_from_override = |override_state: Option<&PlannerMissionOverrideState>| {
         override_state
             .and_then(|entry| entry.rate_override)
-            .map(|value| active_members * (value / 100.0).clamp(0.0, 1.0))
+            .map(|value| {
+                clamp_completion_count(settings, active_members * (value / 100.0).clamp(0.0, 1.0))
+            })
     };
     let count_from_override = |override_state: Option<&PlannerMissionOverrideState>| {
-        override_state.and_then(|entry| entry.count_override)
+        override_state
+            .and_then(|entry| entry.count_override)
+            .map(|value| clamp_completion_count(settings, value))
     };
 
     let planet_count_override = if combat {
         state.cm_count_override
     } else {
         state.fleet_count_override
-    };
+    }
+    .map(|value| clamp_completion_count(settings, value));
     let planet_rate_override = if combat {
         state.cm_rate_override
     } else {
@@ -3297,20 +3330,26 @@ fn mission_expected_completions(
             .or_else(|| rate_from_override(mission_override))
             .or(planet_count_override)
             .or_else(|| {
-                planet_rate_override.map(|value| active_members * (value / 100.0).clamp(0.0, 1.0))
+                planet_rate_override.map(|value| {
+                    clamp_completion_count(
+                        settings,
+                        active_members * (value / 100.0).clamp(0.0, 1.0),
+                    )
+                })
             })
-            .unwrap_or(active_members * default_rate)
-            .max(0.0);
+            .unwrap_or_else(|| default_completion_count(settings, planet, combat));
     }
 
     rate_from_override(mission_override)
         .or_else(|| count_from_override(mission_override))
         .or_else(|| {
-            planet_rate_override.map(|value| active_members * (value / 100.0).clamp(0.0, 1.0))
+            planet_rate_override.map(|value| {
+                clamp_completion_count(settings, active_members * (value / 100.0).clamp(0.0, 1.0))
+            })
         })
         .or(planet_count_override)
         .unwrap_or(active_members * default_rate)
-        .max(0.0)
+        .clamp(0.0, active_members)
 }
 
 fn mission_buckets(planet: &PlannerPlanetDefinition) -> MissionBuckets {
@@ -4671,5 +4710,114 @@ mod tests {
             matching_ops_candidate_ids(&candidates, &by_def, &by_name, &negotiator).len(),
             1
         );
+    }
+
+    fn count_mode_settings() -> PlannerSettings {
+        PlannerSettings {
+            guild_gp: 500_000_000,
+            guild_members: 50,
+            active_members: 50,
+            cm_mode: String::from("count"),
+            undep_mode: String::from("pct"),
+            cm_base: 35.0,
+            cm_falloff: 5.0,
+            fleet_base: 20.0,
+            fleet_falloff: 3.0,
+            daily_undep: vec![0.0; 6],
+            planet_state: Default::default(),
+            planet_hold: None,
+        }
+    }
+
+    fn assert_close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < f64::EPSILON,
+            "expected {expected}, got {actual}"
+        );
+    }
+
+    #[test]
+    fn count_mode_uses_exact_completion_counts() {
+        let settings = count_mode_settings();
+        let planets = planner_planets();
+        let mustafar = planets
+            .iter()
+            .find(|planet| planet.id == "mustafar")
+            .expect("mustafar exists");
+        let geonosis = planets
+            .iter()
+            .find(|planet| planet.id == "geonosis")
+            .expect("geonosis exists");
+        let mustafar_combat = mustafar
+            .missions
+            .iter()
+            .find(|mission| mission.mission_type == "combat")
+            .expect("mustafar combat mission exists");
+        let geonosis_combat = geonosis
+            .missions
+            .iter()
+            .find(|mission| mission.mission_type == "combat")
+            .expect("geonosis combat mission exists");
+        let state = PlannerPlanetState::default();
+
+        assert_close(
+            mission_expected_completions(&settings, mustafar, &state, mustafar_combat, true),
+            35.0,
+        );
+        assert_close(
+            mission_expected_completions(&settings, geonosis, &state, geonosis_combat, true),
+            30.0,
+        );
+        assert_close(effective_cm_rate(&settings, mustafar), 0.7);
+        assert_close(effective_cm_rate(&settings, geonosis), 0.6);
+
+        let mut override_state = PlannerPlanetState {
+            cm_count_override: Some(42.0),
+            ..Default::default()
+        };
+        assert_close(
+            mission_expected_completions(
+                &settings,
+                mustafar,
+                &override_state,
+                mustafar_combat,
+                true,
+            ),
+            42.0,
+        );
+
+        override_state.mission_overrides.insert(
+            mustafar_combat.id.clone(),
+            PlannerMissionOverrideState {
+                rate_override: None,
+                count_override: Some(12.0),
+            },
+        );
+        assert_close(
+            mission_expected_completions(
+                &settings,
+                mustafar,
+                &override_state,
+                mustafar_combat,
+                true,
+            ),
+            12.0,
+        );
+    }
+
+    #[test]
+    fn count_mode_optimizer_completes() {
+        let settings = count_mode_settings();
+        let result = run_optimizer(
+            &settings,
+            &GuildRosters::new(),
+            Some(&OpsDefinitions::new()),
+            "greedy",
+            |_| {},
+        );
+
+        assert_eq!(result.selected_algorithm, "greedy");
+        assert_eq!(result.day_plan.len(), 6);
+        assert!(result.total_stars >= 0);
     }
 }

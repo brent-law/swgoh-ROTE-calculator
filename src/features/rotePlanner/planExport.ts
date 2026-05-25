@@ -199,34 +199,56 @@ function plannerChainDepth(planetId: string) {
   }
 }
 
+function completionCountLimit(plannerSettings: PlannerSettings) {
+  return Math.min(50, Math.max(1, Math.round(plannerSettings.guildMembers || 50)));
+}
+
+function completionCountToPercent(plannerSettings: PlannerSettings, value: number) {
+  const memberCount = completionCountLimit(plannerSettings);
+  const count = Math.min(memberCount, Math.max(0, value));
+  return Math.max(0, Math.min(100, (count / memberCount) * 100));
+}
+
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
 function effectivePlanetRate(
   plannerSettings: PlannerSettings,
   planetId: string,
   missionType: "cm" | "fleet",
 ) {
   const state = plannerSettings.planetState[planetId];
-  const memberCount = Math.max(1, plannerSettings.guildMembers || 50);
+  const depth = plannerChainDepth(planetId);
+  if (plannerSettings.cmMode === "count") {
+    const defaultCount =
+      missionType === "cm"
+        ? plannerSettings.cmBase - plannerSettings.cmFalloff * depth
+        : plannerSettings.fleetBase - plannerSettings.fleetFalloff * depth;
+    const overrideCount =
+      missionType === "cm" ? state?.cmCountOverride : state?.fleetCountOverride;
+    return completionCountToPercent(
+      plannerSettings,
+      typeof overrideCount === "number" ? overrideCount : defaultCount,
+    );
+  }
+
   if (missionType === "cm") {
     if (typeof state?.cmRateOverride === "number") {
-      return Math.max(0, Math.min(100, state.cmRateOverride));
+      return clampPercent(state.cmRateOverride);
     }
     if (typeof state?.cmCountOverride === "number") {
-      return Math.max(0, Math.min(100, (state.cmCountOverride / memberCount) * 100));
+      return completionCountToPercent(plannerSettings, state.cmCountOverride);
     }
-    const depth = plannerChainDepth(planetId);
-    return Math.max(0, Math.min(100, plannerSettings.cmBase - plannerSettings.cmFalloff * depth));
+    return clampPercent(plannerSettings.cmBase - plannerSettings.cmFalloff * depth);
   }
   if (typeof state?.fleetRateOverride === "number") {
-    return Math.max(0, Math.min(100, state.fleetRateOverride));
+    return clampPercent(state.fleetRateOverride);
   }
   if (typeof state?.fleetCountOverride === "number") {
-    return Math.max(0, Math.min(100, (state.fleetCountOverride / memberCount) * 100));
+    return completionCountToPercent(plannerSettings, state.fleetCountOverride);
   }
-  const depth = plannerChainDepth(planetId);
-  return Math.max(
-    0,
-    Math.min(100, plannerSettings.fleetBase - plannerSettings.fleetFalloff * depth),
-  );
+  return clampPercent(plannerSettings.fleetBase - plannerSettings.fleetFalloff * depth);
 }
 
 function getUndeployedGpForDay(plannerSettings: PlannerSettings, dayNumber: number) {

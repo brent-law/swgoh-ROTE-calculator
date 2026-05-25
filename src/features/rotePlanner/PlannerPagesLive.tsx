@@ -9,7 +9,6 @@ import {
   type Ref,
 } from "react";
 import { createPortal } from "react-dom";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useLocation } from "react-router-dom";
 import type {
   ExportPreviewResponse,
@@ -243,7 +242,8 @@ function plannerBonusPlanetUnlocked(
 }
 
 function missionEstimateInputLimit(cmMode: string, memberCount = 50) {
-  return cmMode === "count" ? Math.max(1, Math.round(memberCount || 50)) : 100;
+  const countLimit = Math.min(50, Math.max(1, Math.round(memberCount || 50)));
+  return cmMode === "count" ? countLimit : 100;
 }
 
 function planetPlannerDisplayValue(
@@ -255,22 +255,23 @@ function planetPlannerDisplayValue(
   const depth = plannerDepth(planetId);
   const base = kind === "cm" ? settings.cmBase : settings.fleetBase;
   const falloff = kind === "cm" ? settings.cmFalloff : settings.fleetFalloff;
-  const defaultRate = Math.max(0, base - falloff * depth);
+  const defaultValue = Math.max(0, base - falloff * depth);
 
   if (settings.cmMode === "pct") {
-    return Math.round(
+    const rawValue =
       kind === "cm"
-        ? state?.cmRateOverride ?? defaultRate
-        : state?.fleetRateOverride ?? defaultRate,
-    );
+        ? state?.cmRateOverride ?? defaultValue
+        : state?.fleetRateOverride ?? defaultValue;
+    return Math.round(Math.min(100, Math.max(0, rawValue)));
   }
 
-  const defaultCount = Math.round((settings.guildMembers * defaultRate) / 100);
-  return Math.round(
+  const countLimit = missionEstimateInputLimit(settings.cmMode, settings.guildMembers);
+  const defaultCount = Math.min(countLimit, defaultValue);
+  const rawValue =
     kind === "cm"
       ? state?.cmCountOverride ?? defaultCount
-      : state?.fleetCountOverride ?? defaultCount,
-  );
+      : state?.fleetCountOverride ?? defaultCount;
+  return Math.round(Math.min(countLimit, Math.max(0, rawValue)));
 }
 
 function planetPlannerMissionDisplayValue(
@@ -284,10 +285,17 @@ function planetPlannerMissionDisplayValue(
   const planetValue = planetPlannerDisplayValue(planetId, settings, state, kind);
 
   if (settings.cmMode === "pct") {
-    return Math.round(missionOverride?.rateOverride ?? planetValue);
+    return Math.round(
+      Math.min(100, Math.max(0, missionOverride?.rateOverride ?? planetValue)),
+    );
   }
 
-  return Math.round(missionOverride?.countOverride ?? planetValue);
+  return Math.round(
+    Math.min(
+      missionEstimateInputLimit(settings.cmMode, settings.guildMembers),
+      Math.max(0, missionOverride?.countOverride ?? planetValue),
+    ),
+  );
 }
 
 function starCountFromStatus(status: string) {
@@ -2358,22 +2366,11 @@ export function PlanetPlannerPage() {
 export function ExportPreviewPage() {
   const location = useLocation();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const releasedRef = useRef(false);
-  const closingRef = useRef(false);
   const [preview, setPreview] = useState<ExportPreviewResponse | null>(null);
   const [activeDocumentId, setActiveDocumentId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [closing, setClosing] = useState(false);
   const token = exportPreviewTokenFromSearch(location.search);
-
-  const releasePreview = () => {
-    if (!token || releasedRef.current) {
-      return Promise.resolve();
-    }
-    releasedRef.current = true;
-    return plannerApi.releaseExportPreview(token).catch(() => undefined);
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -2389,7 +2386,6 @@ export function ExportPreviewPage() {
     setLoading(true);
     setError("");
     setPreview(null);
-    releasedRef.current = false;
 
     void plannerApi
       .getExportPreview(token)
@@ -2437,38 +2433,6 @@ export function ExportPreviewPage() {
     frameWindow.print();
   };
 
-  const handleClose = () => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    setClosing(true);
-
-    const currentWindow = getCurrentWebviewWindow();
-    void (async () => {
-      try {
-        await currentWindow.hide();
-      } catch {
-        // Browser/dev fallback: hiding only exists inside Tauri.
-      }
-
-      try {
-        await currentWindow.destroy();
-        return;
-      } catch {
-        // If destroy is unavailable, fall back to the normal close path.
-      }
-
-      try {
-        await currentWindow.close();
-        return;
-      } catch {
-        await releasePreview();
-        window.close();
-        closingRef.current = false;
-        setClosing(false);
-      }
-    })();
-  };
-
   return (
     <section className={styles.exportPreviewShell}>
       <div className={styles.exportPreviewHeader}>
@@ -2490,14 +2454,6 @@ export function ExportPreviewPage() {
             disabled={loading || !activeDocument}
           >
             Print
-          </button>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={handleClose}
-            disabled={closing}
-          >
-            {closing ? "Closing..." : "Close"}
           </button>
         </div>
       </div>

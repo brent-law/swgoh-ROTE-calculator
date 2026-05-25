@@ -338,8 +338,12 @@ function normalizeFiniteNumber(value: number, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function missionEstimateFieldLimit(cmMode: string) {
-  return cmMode === "count" ? 50 : 100;
+function missionEstimateCountLimit(guildMembers: number) {
+  return clampNumber(Math.round(guildMembers) || 50, 1, 50);
+}
+
+function missionEstimateFieldLimit(cmMode: string, guildMembers = 50) {
+  return cmMode === "count" ? missionEstimateCountLimit(guildMembers) : 100;
 }
 
 function missionEstimateFallbackValue(
@@ -348,7 +352,7 @@ function missionEstimateFallbackValue(
   guildMembers: number,
 ) {
   if (cmMode === "count") {
-    const memberCount = clampNumber(Math.round(guildMembers) || 50, 1, 50);
+    const memberCount = missionEstimateCountLimit(guildMembers);
     const multiplierMap = {
       cmBase: 0.7,
       cmFalloff: 0.1,
@@ -372,9 +376,23 @@ function sanitizeMissionEstimateSetting(
   key: "cmBase" | "cmFalloff" | "fleetBase" | "fleetFalloff",
   rawValue: number,
 ) {
-  const limit = missionEstimateFieldLimit(settings.cmMode);
+  const limit = missionEstimateFieldLimit(settings.cmMode, settings.guildMembers);
   const fallback = missionEstimateFallbackValue(key, settings.cmMode, settings.guildMembers);
   return clampNumber(normalizeFiniteNumber(rawValue, fallback), 0, limit);
+}
+
+function sanitizeMissionEstimateSettings(settings: PlannerSettings): PlannerSettings {
+  return {
+    ...settings,
+    cmBase: sanitizeMissionEstimateSetting(settings, "cmBase", settings.cmBase),
+    cmFalloff: sanitizeMissionEstimateSetting(settings, "cmFalloff", settings.cmFalloff),
+    fleetBase: sanitizeMissionEstimateSetting(settings, "fleetBase", settings.fleetBase),
+    fleetFalloff: sanitizeMissionEstimateSetting(
+      settings,
+      "fleetFalloff",
+      settings.fleetFalloff,
+    ),
+  };
 }
 
 function sanitizeDailyUndepValue(settings: PlannerSettings, rawValue: number) {
@@ -425,12 +443,12 @@ function buildPlanetOverridePatch(
   const fleetValue = Math.max(0, settings.fleetBase - settings.fleetFalloff * depth);
 
   if (settings.cmMode === "count") {
-    const memberCount = clampNumber(settings.guildMembers, 1, 50);
+    const memberCount = missionEstimateCountLimit(settings.guildMembers);
     return {
       cmRateOverride: null,
       fleetRateOverride: null,
-      cmCountOverride: clampNumber(Math.round((memberCount * cmValue) / 100), 0, 50),
-      fleetCountOverride: clampNumber(Math.round((memberCount * fleetValue) / 100), 0, 50),
+      cmCountOverride: clampNumber(Math.round(cmValue), 0, memberCount),
+      fleetCountOverride: clampNumber(Math.round(fleetValue), 0, memberCount),
       missionOverrides: {},
     };
   }
@@ -454,7 +472,11 @@ function sanitizeMissionOverridePatch(
     nextPatch.rateOverride = clampNumber(nextPatch.rateOverride, 0, 100);
   }
   if (typeof nextPatch.countOverride === "number") {
-    nextPatch.countOverride = clampNumber(nextPatch.countOverride, 0, 50);
+    nextPatch.countOverride = clampNumber(
+      Math.round(nextPatch.countOverride),
+      0,
+      missionEstimateCountLimit(settings.guildMembers),
+    );
   }
 
   if (settings.cmMode === "pct") {
@@ -481,10 +503,18 @@ function sanitizePlanetPlannerPatch(
     nextPatch.fleetRateOverride = clampNumber(nextPatch.fleetRateOverride, 0, 100);
   }
   if (typeof nextPatch.cmCountOverride === "number") {
-    nextPatch.cmCountOverride = clampNumber(nextPatch.cmCountOverride, 0, 50);
+    nextPatch.cmCountOverride = clampNumber(
+      Math.round(nextPatch.cmCountOverride),
+      0,
+      missionEstimateCountLimit(settings.guildMembers),
+    );
   }
   if (typeof nextPatch.fleetCountOverride === "number") {
-    nextPatch.fleetCountOverride = clampNumber(nextPatch.fleetCountOverride, 0, 50);
+    nextPatch.fleetCountOverride = clampNumber(
+      Math.round(nextPatch.fleetCountOverride),
+      0,
+      missionEstimateCountLimit(settings.guildMembers),
+    );
   }
   if (typeof nextPatch.preloaded === "number") {
     nextPatch.preloaded = clampNumber(Math.round(nextPatch.preloaded), 0, Number.MAX_SAFE_INTEGER);
@@ -718,7 +748,7 @@ function normalizePlannerSettings(
           : defaults.dailyUndep[index];
       })
     : defaults.dailyUndep;
-  return {
+  const settings = {
     guildGp: guildSummary?.gp ?? defaults.guildGp,
     guildMembers,
     activeMembers: guildMembers,
@@ -737,6 +767,7 @@ function normalizePlannerSettings(
     planetState: normalizePlanetPlannerStateMap(record.planetState),
     planetHold: null,
   };
+  return sanitizeMissionEstimateSettings(settings);
 }
 
 function formatGuildScanStatus(payload: GuildScanProgressPayload) {
@@ -1573,6 +1604,14 @@ export const usePlannerStore = create<PlannerStore>()((set, get) => {
         nextSettings.activeMembers = nextMembers;
       } else {
         nextSettings[key] = sanitizeMissionEstimateSetting(nextSettings, key, value);
+      }
+
+      if (nextSettings.cmMode === "count") {
+        const sanitizedSettings = sanitizeMissionEstimateSettings(nextSettings);
+        nextSettings.cmBase = sanitizedSettings.cmBase;
+        nextSettings.cmFalloff = sanitizedSettings.cmFalloff;
+        nextSettings.fleetBase = sanitizedSettings.fleetBase;
+        nextSettings.fleetFalloff = sanitizedSettings.fleetFalloff;
       }
 
       if (nextSettings.undepMode === "flat") {

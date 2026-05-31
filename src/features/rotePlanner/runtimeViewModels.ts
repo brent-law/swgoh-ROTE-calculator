@@ -44,6 +44,12 @@ export type RuntimeOperationsStage = {
   };
 };
 
+type GuildCharacterGearSummary = {
+  label: string;
+  score: number;
+  count: number;
+};
+
 export function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(value)));
 }
@@ -93,13 +99,18 @@ export function buildRosterMembers(
     if (member.allyCode) memberLookup.set(member.allyCode, member);
     if (member.playerId) memberLookup.set(member.playerId, member);
   });
+  const guildCharacterGear = buildGuildCharacterGearSummary(guildRosters);
 
   return Object.entries(guildRosters)
     .filter(([, roster]) => Array.isArray(roster) && roster.length > 0)
     .map(([memberId, roster]) => {
       const member = memberLookup.get(memberId);
-      const characters = roster.filter((unit) => unit.combatType === 1).map(toRosterRow);
-      const ships = roster.filter((unit) => unit.combatType === 2).map(toRosterRow);
+      const characters = roster
+        .filter((unit) => unit.combatType === 1)
+        .map((unit) => toRosterRow(unit, guildCharacterGear));
+      const ships = roster
+        .filter((unit) => unit.combatType === 2)
+        .map((unit) => toRosterRow(unit, guildCharacterGear));
 
       return {
         id: memberId,
@@ -180,6 +191,52 @@ export function filterRosterUnits(
   return sorted;
 }
 
+function buildGuildCharacterGearSummary(guildRosters: GuildRosters) {
+  const summary = new Map<string, GuildCharacterGearSummary>();
+
+  Object.values(guildRosters).forEach((roster) => {
+    if (!Array.isArray(roster)) return;
+    const countedForMember = new Set<string>();
+
+    roster.forEach((unit) => {
+      if (unit.combatType !== 1) return;
+      const key = rosterUnitKey(unit);
+      if (!key || countedForMember.has(key)) return;
+      countedForMember.add(key);
+
+      const score = rosterUnitGearScore(unit);
+      const label = rosterUnitGearLabel(unit);
+      const current = summary.get(key);
+      if (!current || score > current.score) {
+        summary.set(key, {
+          label,
+          score,
+          count: 1,
+        });
+      } else if (score === current.score) {
+        current.count += 1;
+      }
+    });
+  });
+
+  return summary;
+}
+
+function rosterUnitKey(unit: Pick<SimplifiedRosterUnit, "defId" | "name">) {
+  const defId = unit.defId.trim().toUpperCase();
+  if (defId) return `def:${defId}`;
+  const name = unit.name.trim().toLowerCase();
+  return name ? `name:${name}` : "";
+}
+
+function rosterUnitGearScore(unit: Pick<SimplifiedRosterUnit, "gear" | "relic">) {
+  return unit.relic > 0 ? 20 + unit.relic : unit.gear;
+}
+
+function rosterUnitGearLabel(unit: Pick<SimplifiedRosterUnit, "gear" | "relic">) {
+  return unit.relic > 0 ? `R${unit.relic}` : `G${unit.gear}`;
+}
+
 export function buildOperationsMetrics(
   analysis: PlatoonAnalysisMap | null,
   guildRosters: GuildRosters,
@@ -193,7 +250,7 @@ export function buildOperationsMetrics(
     return [
       { label: "Projected Platoons", value: `${totalPlatoons}`, tone: "neutral" },
       { label: "Projected Ops Points", value: "Awaiting scan", tone: "gold" },
-      { label: "Definitions Loaded", value: defs ? "Bundled Wiki" : "Not loaded", tone: "neutral" },
+      { label: "Definitions Loaded", value: defs ? "Bundled Gamedata" : "Not loaded", tone: "neutral" },
       { label: "Roster Coverage", value: `${Object.keys(guildRosters).length}`, tone: "purple" },
     ];
   }
@@ -210,7 +267,7 @@ export function buildOperationsMetrics(
   return [
     { label: "Projected Platoons", value: `${fillable} / ${total}`, tone: "green" },
     { label: "Projected Ops Points", value: `${fillable * 1.0}M`, tone: "gold" },
-    { label: "Definitions Loaded", value: defs ? "Bundled Wiki" : "Not loaded", tone: "neutral" },
+    { label: "Definitions Loaded", value: defs ? "Bundled Gamedata" : "Not loaded", tone: "neutral" },
     { label: "Roster Coverage", value: `${Object.keys(guildRosters).length} members`, tone: "purple" },
   ];
 }
@@ -266,14 +323,19 @@ export function buildPlanetOptions(analysis: PlatoonAnalysisMap | null) {
   return analysis ? Object.keys(analysis) : [];
 }
 
-function toRosterRow(unit: SimplifiedRosterUnit): RosterUnit {
+function toRosterRow(
+  unit: SimplifiedRosterUnit,
+  guildCharacterGear: Map<string, GuildCharacterGearSummary>,
+): RosterUnit {
   const powerValue = Math.max(0, Math.round(unit.power));
+  const guildGear = unit.combatType === 1 ? guildCharacterGear.get(rosterUnitKey(unit)) : null;
   return {
     defId: unit.defId,
     name: unit.name,
     type: unit.combatType === 2 ? "Ship" : "Character",
     stars: `${unit.rarity}`,
     rarity: unit.rarity,
+    highestGuildLevel: guildGear ? `${guildGear.label} (${guildGear.count})` : "-",
     level: unit.combatType === 2 ? "-" : unit.relic > 0 ? `R${unit.relic}` : `G${unit.gear}`,
     gear: unit.gear,
     relic: unit.relic,

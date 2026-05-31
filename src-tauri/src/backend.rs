@@ -48,6 +48,7 @@ const COMLINK_RELEASE_API: &str =
     "https://api.github.com/repos/swgoh-utils/swgoh-comlink/releases/latest";
 const GUILD_SCAN_PROGRESS_EVENT: &str = "guild-scan-progress";
 const PLANNER_OPTIMIZATION_PROGRESS_EVENT: &str = "planner-optimization-progress";
+const BUNDLED_ROTE_OPERATIONS_JSON: &str = include_str!("../bundled/swgoh_rote_operations.json");
 const BUNDLED_OPS_FALLBACK_JSON: &str = include_str!("../bundled/ops_fallback_embedded.json");
 const BUNDLED_UNIT_REFERENCE_JSON: &str = include_str!("../bundled/unit_reference_legacy.json");
 const STATCALC_BRIDGE_SOURCE: &str = include_str!("../python/statcalc_bridge.py");
@@ -59,6 +60,38 @@ struct GuildScanTaskResult {
     key: String,
     display_name: String,
     result: CommandResult<Value>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoteOperationsConflict {
+    id: String,
+    #[serde(default)]
+    linked_conflict_id: String,
+    #[serde(default)]
+    squads: Vec<RoteOperationsSquad>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoteOperationsSquad {
+    #[serde(default)]
+    units: Vec<RoteOperationsUnit>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoteOperationsUnit {
+    #[serde(default)]
+    unit_relic_tier: i64,
+    #[serde(default)]
+    base_id: String,
+    #[serde(default)]
+    name_key: String,
+    #[serde(default)]
+    combat_type: i64,
+    #[serde(default)]
+    rarity: i64,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -175,7 +208,7 @@ pub async fn get_bootstrap_state(app_handle: AppHandle) -> CommandResult<Bootstr
         ops_source: runtime
             .ops_defs_cache
             .as_ref()
-            .map(|_| String::from("bundled-wiki")),
+            .map(|_| String::from("bundled-gamedata")),
     };
     drop(runtime);
 
@@ -592,8 +625,8 @@ pub async fn load_ops_definitions(app_handle: AppHandle) -> CommandResult<OpsDef
         status: String::from("ok"),
         defs,
         count: runtime.ops_defs_cache.as_ref().map_or(0, HashMap::len),
-        source: String::from("bundled-wiki"),
-        source_label: String::from("Bundled wiki definitions"),
+        source: String::from("bundled-gamedata"),
+        source_label: String::from("Bundled SWGOH gamedata operations"),
     })
 }
 
@@ -2014,6 +2047,84 @@ fn load_ops_definitions_internal(runtime: &mut BackendRuntime) -> CommandResult<
         return Ok(defs);
     }
 
+    let defs = load_rote_operations_definitions(runtime).or_else(|gamedata_error| {
+        load_wiki_ops_definitions(runtime).map_err(|fallback_error| {
+            CommandError::new(
+                "ops_data",
+                format!(
+                    "Failed to load bundled ROTE operations gamedata: {}; wiki fallback also failed: {}",
+                    gamedata_error.message, fallback_error.message
+                ),
+            )
+        })
+    })?;
+
+    runtime.ops_defs_cache = Some(defs.clone());
+    Ok(defs)
+}
+
+fn load_rote_operations_definitions(runtime: &BackendRuntime) -> CommandResult<OpsDefinitions> {
+    let conflicts =
+        serde_json::from_str::<Vec<RoteOperationsConflict>>(BUNDLED_ROTE_OPERATIONS_JSON)
+            .map_err(|error| CommandError::new("ops_data", error.to_string()))?;
+    let mut defs = HashMap::<String, Vec<Vec<PlatoonRequirement>>>::new();
+
+    for conflict in conflicts {
+        let Some(planet_id) = rote_operations_planet_id(&conflict) else {
+            continue;
+        };
+        let mut built = Vec::new();
+
+        for squad in conflict.squads {
+            let mut slots = Vec::new();
+            for unit in squad.units {
+                let def_id = normalize_loc_key(&canonical_ops_defid(&unit.base_id));
+                if def_id.is_empty() {
+                    continue;
+                }
+
+                let fallback_name = if unit.name_key.trim().is_empty() {
+                    def_id.clone()
+                } else {
+                    unit.name_key.trim().to_string()
+                };
+                slots.push(PlatoonRequirement {
+                    name: lookup_unit_name(runtime, &def_id, &fallback_name),
+                    def_id,
+                    min_rarity: unit.rarity.max(0),
+                    min_relic: if unit.combat_type == 2 {
+                        0
+                    } else {
+                        rote_operations_relic_level(unit.unit_relic_tier)
+                    },
+                });
+            }
+            if !slots.is_empty() {
+                built.push(slots);
+            }
+        }
+
+        if !built.is_empty() {
+            defs.insert(planet_id.to_string(), built);
+        }
+    }
+
+    if defs.is_empty() {
+        return Err(CommandError::new(
+            "ops_data",
+            "Bundled ROTE operations gamedata did not contain any usable platoon definitions.",
+        ));
+    }
+
+    Ok(defs)
+}
+
+fn rote_operations_relic_level(unit_relic_tier: i64) -> i64 {
+    // Gamedata stores Comlink relic tiers, where R0 starts at tier 2.
+    (unit_relic_tier - 2).max(0)
+}
+
+fn load_wiki_ops_definitions(runtime: &BackendRuntime) -> CommandResult<OpsDefinitions> {
     let wiki_names = load_wiki_ops_names()?;
     let zone_relic_by_planet = zone_relic_by_planet();
     let mut defs = HashMap::<String, Vec<Vec<PlatoonRequirement>>>::new();
@@ -2050,8 +2161,55 @@ fn load_ops_definitions_internal(runtime: &mut BackendRuntime) -> CommandResult<
         }
     }
 
-    runtime.ops_defs_cache = Some(defs.clone());
     Ok(defs)
+}
+
+fn rote_operations_planet_id(conflict: &RoteOperationsConflict) -> Option<&'static str> {
+    match conflict.linked_conflict_id.as_str() {
+        "tb3_mixed_phase01_conflict01" => Some("coruscant"),
+        "tb3_mixed_phase01_conflict02" => Some("mustafar"),
+        "tb3_mixed_phase01_conflict03" => Some("corellia"),
+        "tb3_mixed_phase02_conflict01" => Some("bracca"),
+        "tb3_mixed_phase02_conflict02" => Some("geonosis"),
+        "tb3_mixed_phase02_conflict03" => Some("felucia"),
+        "tb3_mixed_phase03_conflict01" => Some("kashyyyk"),
+        "tb3_mixed_phase03_conflict01_bonus" => Some("zeffo"),
+        "tb3_mixed_phase03_conflict02" => Some("dathomir"),
+        "tb3_mixed_phase03_conflict03" => Some("tatooine"),
+        "tb3_mixed_phase04_conflict01" => Some("lothal"),
+        "tb3_mixed_phase04_conflict02" => Some("medstation"),
+        "tb3_mixed_phase04_conflict03" => Some("kessel"),
+        "tb3_mixed_phase04_conflict03_bonus" => Some("mandalore"),
+        "tb3_mixed_phase05_conflict01" => Some("kafrene"),
+        "tb3_mixed_phase05_conflict02" => Some("malachor"),
+        "tb3_mixed_phase05_conflict03" => Some("vandor"),
+        "tb3_mixed_phase06_conflict01" => Some("scarif"),
+        "tb3_mixed_phase06_conflict02" => Some("deathstar"),
+        "tb3_mixed_phase06_conflict03" => Some("hoth"),
+        _ => match conflict.id.as_str() {
+            "P1-C1" => Some("coruscant"),
+            "P1-C2" => Some("mustafar"),
+            "P1-C3" => Some("corellia"),
+            "P2-C1" => Some("bracca"),
+            "P2-C2" => Some("geonosis"),
+            "P2-C3" => Some("felucia"),
+            "P3-C1" => Some("kashyyyk"),
+            "P3-C1-B" => Some("zeffo"),
+            "P3-C2" => Some("dathomir"),
+            "P3-C3" => Some("tatooine"),
+            "P4-C1" => Some("lothal"),
+            "P4-C2" => Some("medstation"),
+            "P4-C3" => Some("kessel"),
+            "P4-C3-B" => Some("mandalore"),
+            "P5-C1" => Some("kafrene"),
+            "P5-C2" => Some("malachor"),
+            "P5-C3" => Some("vandor"),
+            "P6-C1" => Some("scarif"),
+            "P6-C2" => Some("deathstar"),
+            "P6-C3" => Some("hoth"),
+            _ => None,
+        },
+    }
 }
 
 fn analyze_platoons_internal(
@@ -3905,6 +4063,57 @@ mod tests {
         assert!(ops_defids_match("NEGOTIATOR", "CAPITALNEGOTIATOR"));
         assert!(ops_defids_match("DARTHMAUL", "MAUL"));
         assert!(ops_defids_match("REYSCAVENGER", "REY"));
+    }
+
+    #[test]
+    fn loads_official_rote_operations_definitions() {
+        let runtime = BackendRuntime::default();
+        let defs = load_rote_operations_definitions(&runtime).expect("official ROTE ops data");
+        let expected_planets = [
+            "bracca",
+            "corellia",
+            "coruscant",
+            "dathomir",
+            "deathstar",
+            "felucia",
+            "geonosis",
+            "hoth",
+            "kafrene",
+            "kashyyyk",
+            "kessel",
+            "lothal",
+            "malachor",
+            "mandalore",
+            "medstation",
+            "mustafar",
+            "scarif",
+            "tatooine",
+            "vandor",
+            "zeffo",
+        ];
+
+        assert_eq!(defs.len(), expected_planets.len());
+        for planet_id in expected_planets {
+            let platoons = defs.get(planet_id).expect("mapped planet operations");
+            assert_eq!(platoons.len(), 6, "{planet_id}");
+            assert!(
+                platoons.iter().all(|platoon| platoon.len() == 15),
+                "{planet_id}"
+            );
+        }
+
+        let first_coruscant_slot = &defs["coruscant"][0][0];
+        assert_eq!(first_coruscant_slot.def_id, "GENERALSKYWALKER");
+        assert_eq!(first_coruscant_slot.min_rarity, 7);
+        assert_eq!(first_coruscant_slot.min_relic, 5);
+        assert_eq!(rote_operations_relic_level(11), 9);
+
+        let phantom = defs["coruscant"][0]
+            .iter()
+            .find(|slot| slot.def_id == "PHANTOM2")
+            .expect("ship platoon slot");
+        assert_eq!(phantom.min_rarity, 7);
+        assert_eq!(phantom.min_relic, 0);
     }
 
     #[test]

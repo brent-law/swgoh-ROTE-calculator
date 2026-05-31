@@ -170,6 +170,7 @@ export type RosterUnit = {
   type: "Character" | "Ship";
   stars: string;
   rarity?: number;
+  highestGuildLevel?: string;
   level: string;
   gear?: number;
   relic?: number;

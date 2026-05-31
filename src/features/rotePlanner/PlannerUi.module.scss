@@ -2097,7 +2097,7 @@
 .sortBar,
 .rosterRow {
   display: grid;
-  grid-template-columns: 1.7fr 0.8fr 0.7fr 0.8fr 0.9fr 3fr;
+  grid-template-columns: 1.45fr 1.25fr 0.75fr 0.55fr 0.75fr 0.85fr minmax(16rem, 3fr);
   gap: 0.35rem;
 }
 
@@ -2114,6 +2114,15 @@
   font-size: 0.68rem;
   text-align: left;
   letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sortLabel {
+  padding: 0.2rem 0.25rem;
+  color: var(--planner-text-2);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
   text-transform: uppercase;
 }
 
@@ -2241,6 +2250,12 @@
 
 .rosterPowerValue {
   color: var(--planner-text-2);
+}
+
+.rosterGuildLevel {
+  color: var(--planner-gold);
+  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-size: 0.7rem;
 }
 
 @media (max-width: 980px) {

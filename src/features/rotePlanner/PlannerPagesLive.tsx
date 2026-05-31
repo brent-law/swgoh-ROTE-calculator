@@ -3003,7 +3003,7 @@ export function OperationsPage() {
     ? [
         { label: "Projected Platoons", value: `${plannerSummary.opsFilled} / ${plannerSummary.opsTotal}`, tone: "green" as const },
         { label: "Projected Ops Points", value: formatMillions(plannerSummary.opsPoints), tone: "gold" as const },
-        { label: "Definitions Loaded", value: opsDefinitions ? "Bundled Wiki" : "Not loaded", tone: "neutral" as const },
+        { label: "Definitions Loaded", value: opsDefinitions ? "Bundled Gamedata" : "Not loaded", tone: "neutral" as const },
         { label: "Roster Coverage", value: plannerSummary.rosterCoverage, tone: "purple" as const },
       ]
     : liveMetrics;
@@ -4308,6 +4308,20 @@ export function RosterPage() {
       <div className={styles.sortBar}>
         {[
           ["name", "Character"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`${styles.sortButton} ${
+              rosterSortKey === key ? styles.sortButtonActive : ""
+            }`}
+            onClick={() => setRosterSortKey(key)}
+          >
+            {label}
+          </button>
+        ))}
+        <span className={styles.sortLabel}>Highest Guild Gear/Relic level</span>
+        {[
           ["type", "Type"],
           ["stars", "Star"],
           ["level", "Gear/Relic"],
@@ -4338,6 +4352,9 @@ export function RosterPage() {
             filteredCharacters.map((unit) => (
               <div key={unit.defId ?? unit.name} className={styles.rosterRow}>
                 <span>{unit.name}</span>
+                <span className={styles.rosterGuildLevel}>
+                  {unit.highestGuildLevel ?? "-"}
+                </span>
                 <span>{unit.type}</span>
                 <span>{unit.stars}</span>
                 <span>{unit.level}</span>
@@ -4403,6 +4420,9 @@ export function RosterPage() {
             filteredShips.map((unit) => (
               <div key={unit.defId ?? unit.name} className={styles.rosterRow}>
                 <span>{unit.name}</span>
+                <span className={styles.rosterGuildLevel}>
+                  {unit.highestGuildLevel ?? "-"}
+                </span>
                 <span>{unit.type}</span>
                 <span>{unit.stars}</span>
                 <span>{unit.level}</span>
